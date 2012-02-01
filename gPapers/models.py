@@ -176,7 +176,7 @@ class Paper(models.Model):
         return author_list
     
     def open(self):
-        if full_text and os.path.isfile( self.full_text.path ):
+        if self.full_text and os.path.isfile( self.full_text.path ):
             desktop.open( self.full_text.path )
             self.read_count = self.read_count + 1
             self.save()
