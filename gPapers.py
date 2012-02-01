@@ -20,18 +20,12 @@
 import commands, dircache, getopt, math, os, re, string, sys, thread, threading, time, traceback
 from datetime import date, datetime, timedelta
 from time import strptime
-#from BeautifulSoup 
 import BeautifulSoup
 
 import deps_checker
 import sqlite3
-from django.template import defaultfilters
-import deseb
 import cairo
 import poppler
-
-
-
 
 RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
 PROGRAM = 'gPapers'
@@ -75,7 +69,11 @@ import settings
 import desktop, openanything
 from django.template import defaultfilters
 os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+import django.core.management
+django.core.management.setup_environ(settings)
 from django.db.models import Q
+from django.template import defaultfilters
+import deseb
 from gPapers.models import *
 import importer
 from importer import pango_escape
