@@ -17,9 +17,10 @@
 #    with this program; if not, write to the Free Software Foundation, Inc.,
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import commands, dircache, getopt, math, os, re, string, sys, thread, threading, time, traceback
+import commands, dircache, getopt, math, os, re, string, sys, thread, threading, time, traceback, urllib
 from datetime import date, datetime, timedelta
 from time import strptime
+
 import BeautifulSoup
 
 import deps_checker
@@ -38,6 +39,8 @@ for line in SVN_INFO.split('\n'):
 GPL = open( RUN_FROM_DIR + 'GPL.txt', 'r' ).read()
 
 DATE_FORMAT = '%Y-%m-%d'
+
+PUBMED_URL = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
 
 # GUI imports
 try:
@@ -295,6 +298,13 @@ def import_document( filename, data=None ):
         if paper:
             paper.delete()
 
+def show_html_error_dialog(code):
+    gtk.gdk.threads_enter()
+    error = gtk.MessageDialog( type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL )
+    error.connect('response', lambda x,y: error.destroy())
+    error.set_markup('<b>Unable to Search External Repository</b>\n\nHTTP Error code: %d' % code)
+    error.run()
+    gtk.gdk.threads_leave()
 
 class MainGUI:
     
@@ -1999,95 +2009,83 @@ class MainGUI:
         self.active_threads[ thread.get_ident() ] = 'searching pubmed... (%s)' % search_text
         rows = []
         try:
-            post_data = {
-                'EntrezSystem2.PEntrez.DbConnector.Db': 'pubmed',
-                'EntrezSystem2.PEntrez.DbConnector.TermToSearch': search_text,
-                'EntrezSystem2.PEntrez.Pubmed.CommandTab.LimitsActive': 'false',
-                'EntrezSystem2.PEntrez.Pubmed.Pubmed_ResultsPanel.Pager.InitialPageSize': '20',
-                'EntrezSystem2.PEntrez.Pubmed.Pubmed_ResultsPanel.Pubmed_DisplayBar.PageSize': '20',
-                'EntrezSystem2.PEntrez.Pubmed.Pubmed_ResultsPanel.Pubmed_DisplayBar.Presentation': 'XML',
-            }
-            params = openanything.fetch( 'http://www.ncbi.nlm.nih.gov/sites/entrez', post_data=post_data )
-            post_data['EntrezSystem2.PEntrez.Pubmed.Pubmed_ResultsPanel.Pubmed_DisplayBar.Presentation'] = 'AbstractPlus'
-            params2 = openanything.fetch( 'http://www.ncbi.nlm.nih.gov/sites/entrez', post_data=post_data )
-            if (params['status']==200 or params['status']==302) and (params2['status']==200 or params2['status']==302):
-                soup = BeautifulSoup.BeautifulStoneSoup( params['data'].replace('<i>','').replace('</i>','').replace('<s>','').replace('</s>','').replace('<b>','').replace('</b>','').replace('&gt;','>').replace('&lt;','<') )
-                soup2 = BeautifulSoup.BeautifulSoup( params2['data'] )
-                nodes = soup.findAll( 'tt', attrs={'class':'xmlrep'} )
-                nodes2 = soup2.findAll( 'div', attrs={'class':'PubmedArticle'} )
-                paired_nodes = []
-                for i in range(0,len(nodes)):
-                    paired_nodes.append( (nodes[i], nodes2[i]) )
-                for node, node2 in paired_nodes:
-                    #print 'found one ========================================================'
-                    #print node.prettify()
-                    #print node2.prettify()
-                    try:
-                        authors = []
-                        for author_node in node.findAll('author'):
-                            if author_node.has_key('validyn'):
-                                authors.append( author_node.find('forename').string + ' '+ author_node.find('lastname').string )
-                            else:
-                                authors.append( author_node.find('firstname').string + ' '+ author_node.find('lastname').string )
-                        try:
-                            paper = Paper.objects.get( title=title, authors__name__exact=authors[0] )
-                            paper_id = paper.id
-                            if paper.full_text and os.path.isfile( paper.full_text.path ):
-                                icon = self.ui.get_widget('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
-                            else:
-                                icon = None
-                        except:
-                            #traceback.print_exc()
-                            paper = None
-                            paper_id = -1
-                            icon = None
-                        try: journal = html_strip( node2.findAll('a')[0].string )
-                        except: journal = ''
-                        import_url = ''
-                        try: 
-                            doi = html_strip( node.find('articleid', idtype='doi').string )
-                            import_url = 'http://dx.doi.org/'+doi
-                        except: 
-                            doi = ''
-                        try:
-                            pubmed_id = html_strip( node.find('articleid', idtype='pubmed').string )
-                            import_url = 'http://www.ncbi.nlm.nih.gov/pubmed/'+pubmed_id
-                        except: 
-                            pubmed_id = ''
-                        try: abstract = html_strip( node2.find('p', attrs={'class':'abstract'}).string )
-                        except: abstract = ''
-                        try: year = html_strip( node.find('journal').find('year').string )
-                        except: year = ''
-                        row = ( 
-                            paper_id, # paper id 
-                            pango_escape( ', '.join(authors) ), # authors 
-                            pango_escape( html_strip( node.find('articletitle').string ) ), # title 
-                            pango_escape( journal ), # journal 
-                            pango_escape( year ), # year 
-                            0, # ranking
-                            abstract, # abstract
-                            icon, # icon
-                            import_url, # import_url
-                            doi, # doi
-                            '', # created
-                            '', # updated
-                            '', # empty_str
-                            pubmed_id, # pubmed_id
-                        )
-                        #print thread.get_ident(), 'row =', row
-                        rows.append( row )
-                    except: 
-                        #pass
-                        traceback.print_exc()
+            # First do a query only for ids that is saved on the server
+            query = PUBMED_URL + 'esearch.fcgi?db=pubmed&term=%s&usehistory=y' % urllib.quote_plus(search_text)
+            response = urllib.urlopen(query)
+            if not (response.getcode() == 200 or response.getcode() == 302):
+                show_html_error_dialog(response.getcode())
+                return
+                            
+            parsed_response = BeautifulSoup.BeautifulStoneSoup(response)
+            
+            # Check wether there were any hits at all
+            if int(parsed_response.esearchresult.count.string) == 0:
+                return
+            
+            web_env = parsed_response.esearchresult.webenv.string
+            query_key = parsed_response.esearchresult.querykey.string
+            response.close()
+            
+            # Download the summaries
+            query = PUBMED_URL + 'esummary.fcgi?db=pubmed&query_key=%s&WebEnv=%s' % (query_key, web_env)
+            response = urllib.urlopen(query)
+            if not (response.getcode() == 200 or response.getcode() == 302):
+                show_html_error_dialog(response.getcode())
+                return           
+            parsed_response = BeautifulSoup.BeautifulStoneSoup(response)
+
+            # get information for all documents
+            documents = parsed_response.esummaryresult.findAll('docsum')  
+            for document in documents:
+                print 'document: ', document.prettify()
+                # Extract information
+                pubmed_id = document.id.string
+                doi = document.findAll('item', {'name' : 'doi'})
+                if doi:
+                    doi = doi[0].string
+                title = document.findAll('item', {'name' : 'Title'})[0].string
+                author_list = document.findAll('item', {'name' : 'Author'})
+                authors = [author.string for author in author_list]       
                     
-                self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
-            else:
-                gtk.gdk.threads_enter()
-                error = gtk.MessageDialog( type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL )
-                error.connect('response', lambda x,y: error.destroy())
-                error.set_markup('<b>Unable to Search External Repository</b>\n\nHTTP Error code: %i' % params['status'])
-                error.run()
-                gtk.gdk.threads_leave()
+                try:
+                    paper = Paper.objects.get( title=title )
+                    paper_id = paper.id
+                    if paper.full_text and os.path.isfile( paper.full_text.path ):
+                        icon = self.ui.get_widget('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
+                    else:
+                        icon = None
+                except:
+                    #traceback.print_exc()
+                    paper = None
+                    paper_id = -1
+                    icon = None          
+                
+                journal = document.findAll('item', {'name' : 'FullJournalName'})[0].string
+                year = document.findAll('item', {'name' : 'PubDate'})[0].string[:4]
+                #TODO: Retrieve abstract
+                abstract = ''
+                
+                # Add information to table 
+                row = ( 
+                    paper_id, # paper id 
+                    pango_escape( ', '.join(authors) ), # authors 
+                    pango_escape( title ), # title 
+                    pango_escape( journal ), # journal 
+                    pango_escape( year ), # year 
+                    0, # ranking
+                    abstract, # abstract
+                    icon, # icon
+                    '', # import_url
+                    doi, # doi
+                    '', # created
+                    '', # updated
+                    '', # empty_str
+                    pubmed_id, # pubmed_id
+                )
+                rows.append(row)
+            
+            print 'rows: ', rows
+            self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
         except:
             traceback.print_exc()
         if self.active_threads.has_key( thread.get_ident() ):
@@ -2152,13 +2150,6 @@ class MainGUI:
                         traceback.print_exc()
                     
                 self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
-            else:
-                gtk.gdk.threads_enter()
-                error = gtk.MessageDialog( type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL )
-                error.connect('response', lambda x,y: error.destroy())
-                error.set_markup('<b>Unable to Search External Repository</b>\n\nHTTP Error code: %i' % params['status'])
-                error.run()
-                gtk.gdk.threads_leave()
         except:
             traceback.print_exc()
         if self.active_threads.has_key( thread.get_ident() ):
