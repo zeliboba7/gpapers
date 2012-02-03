@@ -942,7 +942,7 @@ class MainGUI:
 
         column = gtk.TreeViewColumn()
         column.set_title('Title')
-        column.set_min_width(256)
+        column.set_min_width(-1)
         renderer = gtk.CellRendererPixbuf()
         column.pack_start(renderer, expand=False)
         column.add_attribute(renderer, 'pixbuf', 7)
@@ -953,22 +953,22 @@ class MainGUI:
         middle_top_pane.append_column(column)
         
         column = gtk.TreeViewColumn("Authors", gtk.CellRendererText(), markup=1)
-        column.set_min_width(128)
+        column.set_min_width(-1)
         column.set_expand(True)
         column.connect('clicked', sort_model_by_column, self.middle_top_pane_model, 1)
         middle_top_pane.append_column( column )
         column = gtk.TreeViewColumn("Journal", gtk.CellRendererText(), markup=3)
-        column.set_min_width(128)
+        column.set_min_width(-1)
         column.set_expand(True)
         column.connect('clicked', sort_model_by_column, self.middle_top_pane_model, 3)
         middle_top_pane.append_column( column )
         column = gtk.TreeViewColumn("Year", gtk.CellRendererText(), markup=4)
-        column.set_min_width(48)
+        column.set_min_width(-1)
         column.set_expand(False)
         column.connect('clicked', sort_model_by_column, self.middle_top_pane_model, 4)
         middle_top_pane.append_column( column )
         column = gtk.TreeViewColumn("Rating", gtk.CellRendererProgress(), value=5, text=12)
-        column.set_min_width(64)
+        column.set_min_width(-1)
         column.set_expand(False)
         column.connect('clicked', sort_model_by_column, self.middle_top_pane_model, 5)
         middle_top_pane.append_column( column )
@@ -1368,6 +1368,10 @@ class MainGUI:
 #            for ref in paper.reference_set.all():
 #                description.append( ref.line )
             #self.ui.get_widget('paper_information_pane').get_buffer().set_text( '\n'.join(description) )
+            
+            print '***Liststore: ',
+            for i, col in enumerate(liststore[rows[0]]):
+                print i, ': ', col
             
             if liststore[rows[0]][8]:
                 button = gtk.ToolButton(gtk.STOCK_HOME)
@@ -1945,6 +1949,7 @@ class MainGUI:
             params = openanything.fetch( 'http://ieeexplore.ieee.org/search/freesearchresult.jsp?history=yes&queryText=%%28%s%%29&imageField.x=0&imageField.y=0' % defaultfilters.urlencode( search_text ) )
             if params['status']==200 or params['status']==302:
                 soup = BeautifulSoup.BeautifulSoup( params['data'].replace('<!-BMS End-->','') )
+                print soup.prettify()
                 for node in soup.findAll( 'td', attrs={'class':'bodyCopyBlackLarge'} ):
                     try:
                         tds = node.findAll( 'td', attrs={'class':'bodyCopyBlackLargeSpaced'} )
@@ -2041,15 +2046,22 @@ class MainGUI:
                 # Extract information
                 pubmed_id = document.id.string
                 doi = document.findAll('item', {'name' : 'doi'})
+                import_url = ''
                 if doi:
                     doi = doi[0].string
+                    import_url = 'http://dx.doi.org/' + doi
                 title = document.findAll('item', {'name' : 'Title'})[0].string
                 author_list = document.findAll('item', {'name' : 'Author'})
                 authors = [author.string for author in author_list]       
                     
                 try:
-                    paper = Paper.objects.get( title=title )
+                    if doi:
+                        paper = Paper.objects.get( doi=doi )
+                    else:
+                        paper = Paper.objects.get( title=title )
                     paper_id = paper.id
+                    created = paper.created
+                    ranking = paper.ranking
                     if paper.full_text and os.path.isfile( paper.full_text.path ):
                         icon = self.ui.get_widget('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
                     else:
@@ -2058,7 +2070,9 @@ class MainGUI:
                     #traceback.print_exc()
                     paper = None
                     paper_id = -1
-                    icon = None          
+                    icon = None 
+                    created = ''         
+                    ranking = 0
                 
                 journal = document.findAll('item', {'name' : 'FullJournalName'})[0].string
                 year = document.findAll('item', {'name' : 'PubDate'})[0].string[:4]
@@ -2072,12 +2086,12 @@ class MainGUI:
                     pango_escape( title ), # title 
                     pango_escape( journal ), # journal 
                     pango_escape( year ), # year 
-                    0, # ranking
+                    ranking, # ranking
                     abstract, # abstract
                     icon, # icon
-                    '', # import_url
+                    import_url, # import_url
                     doi, # doi
-                    '', # created
+                    created, # created
                     '', # updated
                     '', # empty_str
                     pubmed_id, # pubmed_id
@@ -2161,74 +2175,66 @@ class MainGUI:
         self.active_threads[ thread.get_ident() ] = 'searching google scholar... (%s)' % search_text
         rows = []
         try:
-            print 'woot'
-            params = openanything.fetch( 'http://scholar.google.com/scholar?q=%s' % defaultfilters.urlencode( search_text ) )
-            if params['status']==200 or params['status']==302:
-                for html in params['data'].split('<p class=g>')[1:]:
-                    #print '==========================================='
-                    node = BeautifulSoup.BeautifulStoneSoup( html )
-                    #print node.prettify()
+            response = urllib.urlopen( 'http://scholar.google.com/scholar?q=%s' % urllib.quote_plus(search_text))
+            if response.getcode() == 200 or response.getcode()==302:                    
+                node = BeautifulSoup.BeautifulStoneSoup(node)
+                #print node.prettify()
+                try:
+                    title = html_strip( node.findAll('a')[0].string )
+                    year = ''
+                    import_url = node.findAll('a')[0]['href']
+                    for a in node.findAll('a',attrs={'class':'fl'}):
+                        if a['href'].find('cluster')!=-1:
+                            import_url = a['href']
+                    if not import_url.startswith('http'):
+                        import_url = 'http://scholar.google.com'+ import_url
                     try:
-                        title = html_strip( node.findAll('a')[0].string )
-                        year = ''
-                        import_url = node.findAll('a')[0]['href']
-                        for a in node.findAll('a',attrs={'class':'fl'}):
-                            if a['href'].find('cluster')!=-1:
-                                import_url = a['href']
-                        if not import_url.startswith('http'):
-                            import_url = 'http://scholar.google.com'+ import_url
-                        try:
-                            papers = list( Paper.objects.filter( import_url=import_url ) )
-                            papers.extend( Paper.objects.filter( title=title ) )
-                            paper = papers[0]
-                            paper_id = paper.id
-                            if paper.full_text and os.path.isfile( paper.full_text.path ):
-                                icon = self.ui.get_widget('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
-                            else:
-                                icon = None
-                        except:
-                            #traceback.print_exc()
-                            paper = None
-                            paper_id = -1
+                        papers = list( Paper.objects.filter( import_url=import_url ) )
+                        papers.extend( Paper.objects.filter( title=title ) )
+                        paper = papers[0]
+                        paper_id = paper.id
+                        if paper.full_text and os.path.isfile( paper.full_text.path ):
+                            icon = self.ui.get_widget('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
+                        else:
                             icon = None
-                        
-                        #x = node.findAll('span', attrs={'class':'a'})[0].split('-')
-                        x = html_strip(node.findAll('span', attrs={'class':'a'})[0]).split('-')
-                        try: authors = x[0].strip()
-                        except: authors = ''
-                        try: journal = x[1].strip()
-                        except: journal = ''
-                        try: abstract = '\n'.join( [ html_strip(x) for x in node.findAll('br')[1:] ] )
-                        except: abstract = ''
-                        row = ( 
-                            paper_id, # paper id 
-                            pango_escape( authors ), # authors 
-                            pango_escape( title ), # title 
-                            pango_escape( journal ), # journal 
-                            pango_escape( year ), # year 
-                            0, # ranking
-                            abstract, # abstract
-                            icon, # icon
-                            import_url, # import_url
-                            '', # doi
-                            '', # created
-                            '', # updated
-                            '', # empty_str
-                            '', # pubmed_id
-                        )
-                        rows.append( row )
-                    except: 
-                        #pass
-                        traceback.print_exc()
+                    except:
+                        #traceback.print_exc()
+                        paper = None
+                        paper_id = -1
+                        icon = None
                     
+                    #x = node.findAll('span', attrs={'class':'a'})[0].split('-')
+                    x = html_strip(node.findAll('span', attrs={'class':'a'})[0]).split('-')
+                    try: authors = x[0].strip()
+                    except: authors = ''
+                    try: journal = x[1].strip()
+                    except: journal = ''
+                    try: abstract = '\n'.join( [ html_strip(x) for x in node.findAll('br')[1:] ] )
+                    except: abstract = ''
+                    row = ( 
+                        paper_id, # paper id 
+                        pango_escape( authors ), # authors 
+                        pango_escape( title ), # title 
+                        pango_escape( journal ), # journal 
+                        pango_escape( year ), # year 
+                        0, # ranking
+                        abstract, # abstract
+                        icon, # icon
+                        import_url, # import_url
+                        '', # doi
+                        '', # created
+                        '', # updated
+                        '', # empty_str
+                        '', # pubmed_id
+                    )
+                    rows.append( row )
+                except: 
+                    #pass
+                    traceback.print_exc()
+                
                 self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
             else:
-                gtk.gdk.threads_enter()
-                error = gtk.MessageDialog( type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL )
-                error.connect('response', lambda x,y: error.destroy())
-                error.set_markup('<b>Unable to Search External Repository</b>\n\nHTTP Error code: %i' % params['status'])
-                error.run()
-                gtk.gdk.threads_leave()
+                show_html_error_dialog(response.getcode())
         except:
             traceback.print_exc()
         if self.active_threads.has_key( thread.get_ident() ):

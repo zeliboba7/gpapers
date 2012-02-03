@@ -19,6 +19,7 @@ import commands, dircache, getopt, math, os, re, string, sys, thread, threading,
 from datetime import date, datetime, timedelta
 from time import strptime
 from htmlentitydefs import name2codepoint as n2cp
+import urllib
 
 import pygtk
 pygtk.require("2.0")
@@ -248,8 +249,8 @@ def update_paper_from_bibtex_html( paper, html ):
 def import_citation(url, paper=None, callback=None):
     active_threads[ thread.get_ident() ] = 'importing: '+ url
     try:
-        params = openanything.fetch(url)
-        if params['status']!=200 and params['status']!=302:
+        response = urllib.urlopen(url)
+        if response.getcode()!=200 and response.getcode()!=302:
             print thread.get_ident(), 'unable to download: %s  (%i)' % ( url, params['status'] )
 #            gtk.gdk.threads_enter()
 #            error = gtk.MessageDialog( type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL )
@@ -258,9 +259,12 @@ def import_citation(url, paper=None, callback=None):
 #            gtk.gdk.threads_leave()
             return
         
-        if params['data'].startswith('%PDF'):
+        info = response.info()
+        print info.gettype()
+        
+        if info.gettype() == 'application/pdf':
             # this is a pdf file
-            filename = params['url'][ params['url'].rfind('/')+1 : ]
+            filename = response.geturl()[response.geturl() + 1: ]
             # strip params
             if filename.find('?')>0: filename = filename[ : filename.find('?') ]
             data = params['data']
@@ -272,18 +276,18 @@ def import_citation(url, paper=None, callback=None):
                 if created:
                     #paper.title = filename
                     paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf', data )
-                    paper.import_url = url
+                    paper.import_url = response.geturl()
                     paper.save()
                     print thread.get_ident(), 'imported paper =', filename
                 else:
                     print thread.get_ident(), 'paper already exists: paper =', paper.id, paper.doi, paper.title, paper.get_authors_in_order()
             else:
                 paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf', data )
-                paper.import_url = url
+                paper.import_url = response.geturl()
                 paper.save()
             return paper
         
-        if params['url'].startswith('http://portal.acm.org/citation'):
+        if response.geturl().startswith('http://portal.acm.org/citation'):
             paper = _import_acm_citation(params, paper=paper)
             if paper and callback: callback()
             return paper
@@ -293,22 +297,22 @@ def import_citation(url, paper=None, callback=None):
 #            if paper and refresh_after: main_gui.refresh_middle_pane_search()
 #            return paper
 
-        if params['url'].startswith('http://ieeexplore.ieee.org'):
-            if params['url'].find('search/wrapper.jsp')>-1:
-                paper = _import_ieee_citation( openanything.fetch( params['url'].replace('search/wrapper.jsp','xpls/abs_all.jsp') ), paper=paper )
+        if response.geturl().startswith('http://ieeexplore.ieee.org'):
+            if response.geturl().find('search/wrapper.jsp')>-1:
+                paper = _import_ieee_citation( openanything.fetch(response.geturl().replace('search/wrapper.jsp','xpls/abs_all.jsp') ), paper=paper )
                 if paper and callback: callback()
             else:
                 paper = _import_ieee_citation( params, paper=paper )
                 if paper and callback: callback()
             return paper
         
-        if params['url'].startswith('http://scholar.google.com'):
+        if response.geturl().startswith('http://scholar.google.com'):
             paper = _import_google_scholar_citation(params, paper=paper)
             if paper and callback: callback()
             return paper
 
         # let's see if there's a pdf somewhere in here...
-        paper = _import_unknown_citation(params, params['url'], paper=paper)
+        paper = _import_unknown_citation(response, response.geturl(), paper=paper)
         if paper and callback:callback()
         if paper: return paper
         
@@ -639,14 +643,7 @@ def _import_google_scholar_citation(params, paper=None):
 p_html_a = re.compile( "<a [^>]+>" , re.IGNORECASE)
 p_html_a_href = re.compile( '''href *= *['"]([^'^"]+)['"]''' , re.IGNORECASE)
 
-def _import_unknown_citation(params, orig_url, paper=None):
-    
-    # strip down to just the body (malformed comments like you find in script tags make soup barf)
-    data = params['data']
-    index = data.lower().find('<body>')
-    if index>0: data = data[ index+6 : ]
-    index = data.lower().find('</body>')
-    if index>0: data = data[ : index ]
+def _import_unknown_citation(data, orig_url, paper=None):
     
     # soupify
     soup = BeautifulSoup.BeautifulSoup( data )
