@@ -40,8 +40,6 @@ GPL = open( RUN_FROM_DIR + 'GPL.txt', 'r' ).read()
 
 DATE_FORMAT = '%Y-%m-%d'
 
-PUBMED_URL = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
-
 # GUI imports
 try:
     import pygtk
@@ -66,8 +64,6 @@ LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION = ('add_to_playlist', gtk.TARGET_SAME_APP, 
 MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION = ('reorder_playlist', gtk.TARGET_SAME_WIDGET, 1)
 PDF_PREVIEW_MOVE_NOTE_DND_ACTION = ('move_note', gtk.TARGET_SAME_WIDGET, 2)
 
-
-
 import settings
 import desktop, openanything
 from django.template import defaultfilters
@@ -81,6 +77,7 @@ from gPapers.models import *
 import importer
 from importer import pango_escape
 from importer import html_strip, pango_escape, get_md5_hexdigest_from_data
+from importer import pubmed
 
 NOTE_ICON = gtk.gdk.pixbuf_new_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'note.png' ) )
 BOOKMARK_ICON = gtk.gdk.pixbuf_new_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'bookmark.png' ) )
@@ -290,6 +287,31 @@ def show_html_error_dialog(code):
     error.run()
     gtk.gdk.threads_leave()
 
+def row_from_paper_object(paper, icon=None):
+    assert paper is not None
+
+    if paper.source:
+        journal = paper.source.name
+    else:
+        journal = ''
+        
+    return ( 
+            paper.id, # paper id 
+            pango_escape(', '.join([author.name for author in paper.authors.all()]) ), # authors 
+            pango_escape(paper.title), # title 
+            pango_escape(journal), # journal 
+            'XXXX', # year 
+            paper.rating, # ranking
+            paper.abstract, # abstract
+            icon, # icon
+            paper.import_url, # import_url
+            paper.doi, # doi
+            paper.created, # created
+            paper.updated, # updated
+            '', # empty_str
+            paper.pubmed_id, # pubmed_id
+    )
+    
 class MainGUI:
     
     current_middle_top_pane_refresh_thread_ident = None
@@ -510,6 +532,7 @@ class MainGUI:
     def refresh_middle_pane_search(self):
         self.last_middle_pane_search_string = None
 
+    #FIXME: Use signal instead
     def watch_middle_pane_search(self):
         self.last_middle_pane_search_string = ''
         while True:
@@ -1821,102 +1844,35 @@ class MainGUI:
         selection = self.ui.get_widget('left_pane').get_selection()
         liststore, rows = selection.get_selected_rows()
         liststore.set_value( self.left_pane_model.get_iter((0,)), 0, '<b>My Library</b>  <span foreground="#888888">(%i)</span>' % Paper.objects.count() )
-        gtk.gdk.threads_leave()
-
+        gtk.gdk.threads_leave()  
+        
     def refresh_middle_pane_from_pubmed(self):
         search_text = self.ui.get_widget('middle_pane_search').get_text().strip()
         if not search_text: return
-        self.active_threads[ thread.get_ident() ] = 'searching pubmed... (%s)' % search_text
+        self.active_threads[ thread.get_ident() ] = 'searching pubmed... (%s)' % search_text        
         rows = []
         try:
-            # First do a query only for ids that is saved on the server
-            query = PUBMED_URL + 'esearch.fcgi?db=pubmed&term=%s&usehistory=y' % urllib.quote_plus(search_text)
-            response = urllib.urlopen(query)
-            if not (response.getcode() == 200 or response.getcode() == 302):
-                show_html_error_dialog(response.getcode())
-                return
-                            
-            parsed_response = BeautifulSoup.BeautifulStoneSoup(response)
-            
-            # Check wether there were any hits at all
-            if int(parsed_response.esearchresult.count.string) == 0:
-                return
-            
-            web_env = parsed_response.esearchresult.webenv.string
-            query_key = parsed_response.esearchresult.querykey.string
-            response.close()
-            
-            # Download the summaries
-            query = PUBMED_URL + 'esummary.fcgi?db=pubmed&query_key=%s&WebEnv=%s' % (query_key, web_env)
-            response = urllib.urlopen(query)
-            if not (response.getcode() == 200 or response.getcode() == 302):
-                show_html_error_dialog(response.getcode())
-                return           
-            parsed_response = BeautifulSoup.BeautifulStoneSoup(response)
-
-            # get information for all documents
-            documents = parsed_response.esummaryresult.findAll('docsum')  
-            for document in documents:
-                print 'document: ', document.prettify()
-                # Extract information
-                pubmed_id = document.id.string
-                doi = document.findAll('item', {'name' : 'doi'})
-                import_url = ''
-                if doi:
-                    doi = doi[0].string
-                    import_url = 'http://dx.doi.org/' + doi
-                title = document.findAll('item', {'name' : 'Title'})[0].string
-                author_list = document.findAll('item', {'name' : 'Author'})
-                authors = [author.string for author in author_list]       
-                    
+            papers = pubmed.search(search_text)
+            for paper in papers:        
                 try:
-                    if doi:
-                        paper = Paper.objects.get( doi=doi )
-                    else:
-                        paper = Paper.objects.get( title=title )
-                    paper_id = paper.id
-                    created = paper.created
-                    ranking = paper.ranking
-                    if paper.full_text and os.path.isfile( paper.full_text.path ):
-                        icon = self.ui.get_widget('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
+                    existing_paper = Paper.objects.get(pubmed_id=pubmed_id)
+                    if existing_paper.full_text and \
+                               os.path.isfile(existing_paper.full_text.path):
+                        icon = self.ui.get_widget('middle_top_pane').\
+                                        render_icon(gtk.STOCK_DND,
+                                        gtk.ICON_SIZE_MENU)
                     else:
                         icon = None
                 except:
-                    #traceback.print_exc()
-                    paper = None
-                    paper_id = -1
                     icon = None 
-                    created = ''         
-                    ranking = 0
-                
-                journal = document.findAll('item', {'name' : 'FullJournalName'})[0].string
-                year = document.findAll('item', {'name' : 'PubDate'})[0].string[:4]
-                #TODO: Retrieve abstract
-                abstract = ''
-                
+                               
                 # Add information to table 
-                row = ( 
-                    paper_id, # paper id 
-                    pango_escape( ', '.join(authors) ), # authors 
-                    pango_escape( title ), # title 
-                    pango_escape( journal ), # journal 
-                    pango_escape( year ), # year 
-                    ranking, # ranking
-                    abstract, # abstract
-                    icon, # icon
-                    import_url, # import_url
-                    doi, # doi
-                    created, # created
-                    '', # updated
-                    '', # empty_str
-                    pubmed_id, # pubmed_id
-                )
-                rows.append(row)
-            
-            print 'rows: ', rows
+                rows.append(row_from_paper_object(paper))
+                        
             self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
         except:
             traceback.print_exc()
+            
         if self.active_threads.has_key( thread.get_ident() ):
             del self.active_threads[ thread.get_ident() ]
 

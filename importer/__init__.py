@@ -43,7 +43,7 @@ p_doi = re.compile( 'doi *: *(10.[a-z0-9]+/[a-z0-9.]+)', re.IGNORECASE )
 thread.start_new_thread( openanything.fetch, ('http://scholar.google.com/scholar_setprefs?num=100&scis=yes&scisf=4&submit=Save+Preferences',) )
 
 def latex2unicode(s):
-    """    
+    """
     *  \`{o} produces a grave accent
     * \'{o} produces an acute accent
     * \^{o} produces a circumflex
@@ -111,7 +111,7 @@ def get_or_create_paper_via( id=None, doi=None, pubmed_id=None, import_url=None,
     if id>=0:
         try: paper = Paper.objects.get(id=id)
         except: pass
-        
+
     if doi:
         if paper:
             if not paper.doi:
@@ -119,7 +119,7 @@ def get_or_create_paper_via( id=None, doi=None, pubmed_id=None, import_url=None,
         else:
             try: paper = Paper.objects.get(doi=doi)
             except: pass
-    
+
     if pubmed_id:
         if paper:
             if not paper.pubmed_id:
@@ -127,7 +127,7 @@ def get_or_create_paper_via( id=None, doi=None, pubmed_id=None, import_url=None,
         else:
             try: paper = Paper.objects.get(pubmed_id=pubmed_id)
             except: pass
-    
+
     if import_url:
         if paper:
             if not paper.import_url:
@@ -135,12 +135,12 @@ def get_or_create_paper_via( id=None, doi=None, pubmed_id=None, import_url=None,
         else:
             try: paper = Paper.objects.get(import_url=import_url)
             except: pass
-    
+
     if full_text_md5:
         if not paper:
             try: paper = Paper.objects.get(full_text_md5=full_text_md5)
             except: pass
-    
+
     if title:
         if paper:
             if not paper.title:
@@ -148,7 +148,7 @@ def get_or_create_paper_via( id=None, doi=None, pubmed_id=None, import_url=None,
         else:
             try: paper = Paper.objects.get(title=title)
             except: pass
-    
+
     if not paper:
         # it looks like we haven't seen this paper before...
         if title==None: title = ''
@@ -157,33 +157,33 @@ def get_or_create_paper_via( id=None, doi=None, pubmed_id=None, import_url=None,
         if import_url==None: import_url = ''
         paper = Paper.objects.create( doi=doi, pubmed_id=pubmed_id, import_url=import_url, title=title )
         created = True
-        
+
     return paper, created
 
 
 def update_paper_from_bibtex_html( paper, html ):
-    
+
     # ieee puts <br>s in their bibtex
     html = html.replace('<br>','\n')
-    
+
     match = p_bibtex.search( html )
     if match:
-        
+
         bibtex_lines = [ x.strip() for x in match.group(1).split('\n') ]
         bibtex = {}
-        
+
         for x in bibtex_lines:
             i = x.find('=')
             if i>0:
                 k, v = x[:i].strip(), x[i+1:].strip()
                 bibtex[k.lower()] = latex2unicode( v.strip('"\'{},') )
-                
+
         # fix for ACM's doi retardedness
         if bibtex.get('doi','').startswith('http://dx.doi.org/'):
             bibtex['doi'] = bibtex['doi'][ len('http://dx.doi.org/'): ]
         if bibtex.get('doi','').startswith('http://doi.acm.org/'):
             bibtex['doi'] = bibtex['doi'][ len('http://doi.acm.org/'): ]
-                
+
         # create our paper if not provided for us
         if not paper:
             paper, created = get_or_create_paper_via( doi=bibtex.get('doi'), title=bibtex.get('title') )
@@ -191,12 +191,12 @@ def update_paper_from_bibtex_html( paper, html ):
                 print thread.get_ident(), 'creating paper:', paper
             else:
                 print thread.get_ident(), 'updating paper:', paper
-            
+
         if bibtex.get('doi'): paper.doi = bibtex.get('doi','')
         if bibtex.get('title'): paper.title = bibtex.get('title','')
         if bibtex.get('source_pages'): paper.source_pages = bibtex.get('pages','')
         if bibtex.get('abstract'): paper.abstract = bibtex.get('abstract','')
-    
+
         # search for author information
         if bibtex.get('author') and paper.authors.count()==0:
             for author_name in bibtex['author'].split(' and '):
@@ -229,15 +229,15 @@ def update_paper_from_bibtex_html( paper, html ):
             if created:
                 source.save()
             paper.source = source
-        
+
 
         paper.bibtex = match.group(0)
         paper.save()
         print thread.get_ident(), 'imported bibtex =', bibtex
 
     return paper
-            
-            
+
+
 def import_citation(url, paper=None, callback=None):
     active_threads[ thread.get_ident() ] = 'importing: '+ url
     try:
@@ -250,10 +250,10 @@ def import_citation(url, paper=None, callback=None):
 #            error.run()
 #            gtk.gdk.threads_leave()
             return
-        
+
         info = response.info()
         print info.gettype()
-        
+
         if info.gettype() == 'application/pdf':
             # this is a pdf file
             filename = response.geturl()[response.geturl() + 1: ]
@@ -261,7 +261,7 @@ def import_citation(url, paper=None, callback=None):
             if filename.find('?')>0: filename = filename[ : filename.find('?') ]
             data = params['data']
             print thread.get_ident(), 'importing paper =', filename
-            
+
             if not paper:
                 md5_hexdigest = get_md5_hexdigest_from_data( data )
                 paper, created = get_or_create_paper_via( full_text_md5=md5_hexdigest )
@@ -278,36 +278,12 @@ def import_citation(url, paper=None, callback=None):
                 paper.import_url = response.geturl()
                 paper.save()
             return paper
-        
-        if response.geturl().startswith('http://portal.acm.org/citation'):
-            paper = _import_acm_citation(params, paper=paper)
-            if paper and callback: callback()
-            return paper
-
-#        if params['url'].startswith('http://dx.doi.org'):
-#            paper = import_unknown_citation(params)
-#            if paper and refresh_after: main_gui.refresh_middle_pane_search()
-#            return paper
-
-        if response.geturl().startswith('http://ieeexplore.ieee.org'):
-            if response.geturl().find('search/wrapper.jsp')>-1:
-                paper = _import_ieee_citation( openanything.fetch(response.geturl().replace('search/wrapper.jsp','xpls/abs_all.jsp') ), paper=paper )
-                if paper and callback: callback()
-            else:
-                paper = _import_ieee_citation( params, paper=paper )
-                if paper and callback: callback()
-            return paper
-        
-        if response.geturl().startswith('http://scholar.google.com'):
-            paper = _import_google_scholar_citation(params, paper=paper)
-            if paper and callback: callback()
-            return paper
 
         # let's see if there's a pdf somewhere in here...
         paper = _import_unknown_citation(response, response.geturl(), paper=paper)
         if paper and callback:callback()
         if paper: return paper
-        
+
     except:
         traceback.print_exc()
         gtk.gdk.threads_enter()
@@ -325,13 +301,13 @@ def import_citation(url, paper=None, callback=None):
     gtk.gdk.threads_leave()
     if active_threads.has_key( thread.get_ident() ):
         del active_threads[ thread.get_ident() ]
-    
+
 def _import_google_scholar_citation(params, paper=None):
     print thread.get_ident(), 'downloading google scholar citation:', params['url']
     try:
         print thread.get_ident(), 'parsing...'
         soup = BeautifulSoup.BeautifulSoup( params['data'] )
-        
+
         # search for bibtex link
         def f(paper):
             for a in soup.findAll('a'):
@@ -343,9 +319,9 @@ def _import_google_scholar_citation(params, paper=None):
                             paper = update_paper_from_bibtex_html( paper, params_bibtex['data'] )
                             return
         f(paper)
-        
+
         find_and_attach_pdf( paper, urls=[ x['href'] for x in soup.findAll('a', onmousedown=True) ] )
-                    
+
         print thread.get_ident(), 'imported paper =', paper.id, paper.doi, paper.title, paper.get_authors_in_order()
         return paper
     except:
@@ -355,18 +331,18 @@ p_html_a = re.compile( "<a [^>]+>" , re.IGNORECASE)
 p_html_a_href = re.compile( '''href *= *['"]([^'^"]+)['"]''' , re.IGNORECASE)
 
 def _import_unknown_citation(data, orig_url, paper=None):
-    
+
     # soupify
     soup = BeautifulSoup.BeautifulSoup( data )
-    
+
     # search for bibtex link
     for a in soup.findAll('a'):
         for c in a.contents:
             if str(c).lower().find('bibtex')!=-1:
                 print thread.get_ident(), 'found bibtex link:', a
                 #TODO: Do something with bibtex link
-                
-    # search for ris link 
+
+    # search for ris link
     for a in soup.findAll('a'):
         if not a.has_key('href'):
             continue
@@ -380,7 +356,7 @@ def _import_unknown_citation(data, orig_url, paper=None):
             if c.find('refworks')!=-1 or c.find('procite')!=-1 or c.find('refman')!=-1 or c.find('endnote')!=-1:
                 print thread.get_ident(), 'found ris link:', a
                 #TODO: Do something with bibtex link
-    
+
     # search for pdf link
     # TODO: If more than one link is found, present the choice to the user
     pdf_link = None
@@ -400,13 +376,13 @@ def _import_unknown_citation(data, orig_url, paper=None):
             if c.find('pdf')!=-1:
                 print thread.get_ident(), 'found pdf link:', a
                 pdf_link = a['href']
-                break   
-    
+                break
+
     if pdf_link:
         #Combine the base URL with the PDF link (necessary for relative URLs)
         pdf_link = urlparse.urljoin(orig_url, pdf_link)
         return import_citation(pdf_link)
-		
+
 
 
 def find_and_attach_pdf(paper, urls, visited_urls=set() ):
@@ -429,7 +405,7 @@ def find_and_attach_pdf(paper, urls, visited_urls=set() ):
                         return True
                     except:
                         traceback.print_exc()
-                    
+
     for url in urls:
         visited_urls.add(url)
         params = openanything.fetch(url)
