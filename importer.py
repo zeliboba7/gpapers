@@ -19,7 +19,7 @@ import commands, dircache, getopt, math, os, re, string, sys, thread, threading,
 from datetime import date, datetime, timedelta
 from time import strptime
 from htmlentitydefs import name2codepoint as n2cp
-import urllib
+import urllib, urlparse
 
 import pygtk
 pygtk.require("2.0")
@@ -34,12 +34,6 @@ from gPapers.models import *
 from django.template import defaultfilters
 import BeautifulSoup, openanything
 active_threads = None
-
-
-ACM_BASE_URL = 'http://portal.acm.org'
-IEEE_BASE_URL = 'http://ieeexplore.ieee.org'
-ACM_USERNAME = None
-ACM_PASSWORD = None
 
 p_bibtex = re.compile( '[@][a-z]+[\s]*{([^<]*)}', re.IGNORECASE | re.DOTALL )
 p_whitespace = re.compile( '[\s]+')
@@ -67,8 +61,6 @@ def latex2unicode(s):
     """
     # TODO: expand this to really work
     return s.replace('\c{s}',u's')
-
-
 
 def _decode_htmlentities(string):
     entity_re = re.compile("&(#?)(\d{1,5}|\w{1,8});")
@@ -334,287 +326,6 @@ def import_citation(url, paper=None, callback=None):
     if active_threads.has_key( thread.get_ident() ):
         del active_threads[ thread.get_ident() ]
     
-
-
-
-def _import_acm_citation(params, paper=None):
-    print thread.get_ident(), 'downloading acm citation:', params['url']
-    try:
-        print thread.get_ident(), 'parsing...'
-        
-        soup = BeautifulSoup.BeautifulSoup( params['data'] )
-        
-        title = []
-        for node in soup.findAll('td', attrs={'class':'medium-text'})[0].findAll('strong'):
-            title.append(node.string)
-        try: 
-            doi = str(soup.find('form', attrs={'name':'popbinder'}).nextSibling.table.findAll('tr')[-1].findAll('td')[-1].a.string)
-            if doi.startswith('http://doi.acm.org/'):
-                doi = doi[len('http://doi.acm.org/'):]
-        except: doi = ''
-
-        full_text_data = None
-        full_text_filename = None
-        for node in soup.findAll('a', attrs={'name':'FullText'}):
-            if node.contents[1]=='Pdf':
-                file_url = ACM_BASE_URL +'/'+ node['href']
-                print thread.get_ident(), 'downloading paper from', file_url
-                params_file = openanything.fetch(file_url)
-                if params_file['status']==200 or params_file['status']==302 :
-                    try:
-                        ext = params_file['url']
-                        if ext.find('?')>-1:
-                            ext = file_url[0:ext.find('?')]
-                        ext = ext[ ext.rfind('.')+1: ]
-                    except:
-                        ext = 'unknown'
-                    
-                    if params_file['data'].startswith('%PDF'):
-                        #paper.save_file( defaultfilters.slugify(paper.doi) +'_'+ defaultfilters.slugify(paper.title) +'.pdf', params_file['data'] )
-                        full_text_filename = defaultfilters.slugify(doi) +'_'+ defaultfilters.slugify(title) +'.'+ defaultfilters.slugify(ext)
-                        full_text_data = params_file['data']
-                    elif params_file['data'].find('<!DOCTYPE')>-1 and params_file['data'].find('logfrm')>-1:
-                        # it appears we have an ACM login page...
-
-                        global ACM_USERNAME
-                        global ACM_PASSWORD
-                        if not ACM_USERNAME:
-                            dialog = gtk.MessageDialog( type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_OK_CANCEL, flags=gtk.DIALOG_MODAL )
-                            #dialog.connect('response', lambda x,y: dialog.destroy())
-                            dialog.set_markup('<b>ACM Login</b>\n\nEnter your ACM username and password:')
-                            entry_username = gtk.Entry()
-                            entry_password = gtk.Entry()
-                            entry_password.set_activates_default(True)
-                            dialog.vbox.pack_start(entry_username)
-                            dialog.vbox.pack_start(entry_password)
-                            dialog.set_default_response(gtk.RESPONSE_OK)
-                            gtk.gdk.threads_enter()
-                            dialog.show_all()
-                            response = dialog.run()
-                            if response == gtk.RESPONSE_OK:
-                                ACM_USERNAME = entry_username.get_text()
-                                ACM_PASSWORD = entry_password.get_text()
-                            gtk.gdk.threads_leave()
-                            dialog.destroy()
-                            
-                        post_data = {'username':ACM_USERNAME, 'password':ACM_PASSWORD, 'submit':'Login'}
-                        params_login = openanything.fetch('https://portal.acm.org/poplogin.cfm?is=0&amp;dl=ACM&amp;coll=ACM&amp;comp_id=1220288&amp;want_href=delivery%2Ecfm%3Fid%3D1220288%26type%3Dpdf%26CFID%3D50512225%26CFTOKEN%3D24664038&amp;CFID=50512225&amp;CFTOKEN=24664038&amp;td=1200684914991', post_data=post_data, )
-                        print "params_login['url']", params_login['url']
-                        cfid = re.search( 'CFID=([0-9]*)', params_login['data'] ).group(1)
-                        cftoken = re.search( 'CFTOKEN=([0-9]*)', params_login['data'] ).group(1)
-                        new_file_url = file_url[0:file_url.find('&CFID=')] + '&CFID=%s&CFTOKEN=%s' % (cfid,cftoken)
-                        print 'new_file_url', new_file_url
-                        params_file = openanything.fetch(new_file_url)
-                        if params_file['status']==200 or params_file['status']==302 :
-                            if params_file['data'].startswith('%PDF'):
-                                full_text_filename = defaultfilters.slugify(doi) +'_'+ defaultfilters.slugify(title) +'.'+ defaultfilters.slugify(ext)
-                                full_text_data = params_file['data']
-                            else:
-                                print thread.get_ident(), 'error downloading paper - still not a pdf after login:', params_file
-                        else:
-                            print thread.get_ident(), 'error downloading paper - after login:', params_file
-                    else:
-                        print thread.get_ident(), 'this does not appear to be a pdf file...'
-                        ext = params_file['url'][ params_file['url'].rfind('.')+1:]
-                        if not ext or len(ext)>5:
-                            ext = 'unknown'
-                        #paper.save_file( defaultfilters.slugify(paper.doi) +'_'+ defaultfilters.slugify(paper.title) +'.'+ defaultfilters.slugify(ext), params_file['data'] )
-                        full_text_filename = defaultfilters.slugify(doi) +'_'+ defaultfilters.slugify(title) +'.'+ defaultfilters.slugify(ext)
-                        full_text_data = params_file['data']
-                    #paper.save()
-                    break
-                else:
-                    print thread.get_ident(), 'error downloading paper:', params_file
-        
-        if not paper:
-            if full_text_data:
-                md5_hexdigest = get_md5_hexdigest_from_data( full_text_data )
-            else:
-                md5_hexdigest = None
-            paper, created = get_or_create_paper_via(
-                title = html_strip(''.join(title)),
-                doi = doi,
-                full_text_md5 = md5_hexdigest,
-            )
-            if created:
-                if full_text_filename and full_text_data:
-                    paper.save_file( full_text_filename, full_text_data )
-                paper.save()
-            else: 
-                print thread.get_ident(), 'paper already imported'
-                if not _should_we_reimport_paper(paper):
-                    return
-        else:
-            paper.title = html_strip(''.join(title))
-            paper.doi = doi
-            paper.save()
-            if full_text_filename and full_text_data:
-                paper.save_file( full_text_filename, full_text_data )
-            
-
-        paper.import_url = params['url']
-        
-        try: paper.source_session = html_strip( re.search( 'SESSION:(.*)', params['data'] ).group(1) )
-        except: pass
-        try: 
-            abstract_node = soup.find('p', attrs={'class':'abstract'}).string
-            if abstract_node:
-                paper.abstract = html_strip( abstract_node )
-            else:
-                paper.abstract = ''
-        except: pass
-        paper.save()
-        
-        p_bibtex_link = re.compile( "popBibTex.cfm[^']+")
-        bibtex_link = p_bibtex_link.search( params['data'] )
-        if bibtex_link:
-            params_bibtex = openanything.fetch('http://portal.acm.org/'+bibtex_link.group(0))
-            if params_bibtex['status']==200 or params_bibtex['status']==302:
-                update_paper_from_bibtex_html( paper, params_bibtex['data'] )
-
-        node = soup.find('div', attrs={'class':'sponsors'})
-        if node:
-            for node in node.contents:
-                if isinstance( node, BeautifulSoup.NavigableString ):
-                    sponsor_name = html_strip( node.replace(':','') )
-                    if sponsor_name:
-                        sponsor, created = Sponsor.objects.get_or_create(
-                            name = sponsor_name,
-                        )
-                        if created: sponsor.save()
-                        paper.sponsors.add( sponsor )
-                    
-        if soup.find('a', attrs={'name':'references'}):
-            for node in soup.find('a', attrs={'name':'references'}).parent.findNextSibling('table').findAll('tr'):
-                node = node.findAll('td')[2].div
-                line = None
-                doi = ''
-                acm_referencing_url = ''
-                for a in node.findAll('a'):
-                    if a['href'].startswith('citation'):
-                        line = html_strip(a.string)
-                        acm_referencing_url = ACM_BASE_URL +'/'+ a['href']
-                    if a['href'].startswith('http://dx.doi.org'):
-                        doi = html_strip(a.string)
-                if not line: line = html_strip(node.contents[0])
-                reference, created = Reference.objects.get_or_create(
-                    line_from_referencing_paper = line,
-                    url_from_referencing_paper = acm_referencing_url,
-                    doi_from_referencing_paper = doi,
-                    referencing_paper = paper,
-                )
-                if created: reference.save()
-        
-        if soup.find('a', attrs={'name':'citings'}):
-            for node in soup.find('a', attrs={'name':'citings'}).parent.findNextSibling('table').findAll('tr'):
-                node = node.findAll('td')[1].div
-                if node.string:
-                    reference, created = Reference.objects.get_or_create(
-                        line_from_referenced_paper = html_strip(node.string),
-                        referenced_paper = paper,
-                    )
-                    if created: reference.save()
-                else:
-                    line = ''
-                    doi = ''
-                    for a in node.findAll('a'):
-                        if a['href'].startswith('citation'):
-                            line = html_strip(a.string)
-                            url_from_referenced_paper = ACM_BASE_URL +'/'+ a['href']
-                        if a['href'].startswith('http://dx.doi.org'):
-                            doi = html_strip(a.string)
-                    reference, created = Reference.objects.get_or_create(
-                        line_from_referenced_paper = line,
-                        url_from_referenced_paper = url_from_referenced_paper,
-                        doi_from_referenced_paper = doi,
-                        referenced_paper = paper,
-                    )
-                    if created: reference.save()
-        
-        
-        paper.save()
-        print thread.get_ident(), 'imported paper =', paper.doi, paper.title, paper.get_authors_in_order()
-        return paper
-    except:
-        traceback.print_exc()
-
-
-def _import_ieee_citation(params, paper=None):
-    print thread.get_ident(), 'downloading ieee citation:', params['url']
-    try:
-        print thread.get_ident(), 'parsing...'
-        soup = BeautifulSoup.BeautifulSoup( params['data'].replace('<!-BMS End-->','').replace('<in>','') )
-        
-        print soup.find('span', attrs={'class':'headNavBlueXLarge2'})
-
-        p_arnumber = re.compile( '<arnumber>[0-9]+</arnumber>', re.IGNORECASE )
-        match = p_arnumber.search( params['data'] )
-        if match:
-            arnumber = match.group(0)
-            print 'arnumber', arnumber
-            params_bibtex = openanything.fetch('http://ieeexplore.ieee.org/xpls/citationAct', post_data={ 'dlSelect':'cite_abs', 'fileFormate':'BibTex', 'arnumber':arnumber, 'Submit':'Download'  } )
-            print params_bibtex
-            if params_bibtex['status']==200 or params_bibtex['status']==302:
-                paper = update_paper_from_bibtex_html( paper, params_bibtex['data'] )
-        
-        if not paper:
-            paper, created = get_or_create_paper_via(
-                title = html_strip( str(soup.find('title').string).replace('IEEEXplore#','') ),
-                doi = re.search( 'Digital Object Identifier: ([a-zA-Z0-9./]*)', params['data'] ).group(1),
-            )
-            if created: paper.save()
-            else: 
-                print thread.get_ident(), 'paper already imported'
-                if not _should_we_reimport_paper(paper):
-                    return
-
-#        publisher, created = Publisher.objects.get_or_create(
-#            name=html_strip( BeautifulSoup.BeautifulSoup( re.search( 'This paper appears in: (.*)', params['data'] ).group(1) ).a.strong.string ),
-#        )
-#        print 'publisher', publisher
-#        if created: publisher.save()
-        
-        source_string = html_strip( BeautifulSoup.BeautifulSoup( re.search( 'This paper appears in: (.*)', params['data'] ).group(1) ).a.strong.string )
-        try: location = html_strip( re.search( 'Location: (.*)', params['data'] ).group(1) )
-        except: location = ''
-        source, created = Source.objects.get_or_create(
-            name = source_string,
-            issue = html_strip(''),
-            location = location,
-            publication_date = None,
-            publisher = None,
-        )
-        
-        paper.import_url = params['url']
-        paper.source = source
-        paper.source_session = ''
-        #paper.source_pages = html_strip( re.search( 'On page(s):(.*)<BR>', params['data'], re.DOTALL ).group(1) ),
-        paper.abstract = html_strip( soup.findAll( 'td', attrs={'class':'bodyCopyBlackLargeSpaced'})[0].contents[-1] )
-        paper.save()
-        
-        for node in soup.findAll('a', attrs={'class':'bodyCopy'}):
-            if node.contents[0]=='PDF':
-                file_url = IEEE_BASE_URL + node['href']
-                print thread.get_ident(), 'downloading paper from', file_url
-                params = openanything.fetch(file_url)
-                if params['status']==200 or params['status']==302:
-                    if params['data'].startswith('%PDF'):
-                        ext = params['url'][ params['url'].rfind('.')+1:]
-                        if not ext or len(ext)>5:
-                            ext = 'pdf'
-                        paper.save_file( defaultfilters.slugify(paper.doi) +'_'+ defaultfilters.slugify(paper.title) +'.'+ defaultfilters.slugify(ext), params['data'] )
-                        paper.save()
-                    else:
-                        print thread.get_ident(), 'this isn\'t a pdf file:', params['url']
-                    break
-                else:
-                    print thread.get_ident(), 'error downloading paper:', params
-        
-        print thread.get_ident(), 'imported paper =', paper.id, paper.doi, paper.title, paper.get_authors_in_order()
-        return paper
-    except:
-        traceback.print_exc()
-
 def _import_google_scholar_citation(params, paper=None):
     print thread.get_ident(), 'downloading google scholar citation:', params['url']
     try:
@@ -653,9 +364,12 @@ def _import_unknown_citation(data, orig_url, paper=None):
         for c in a.contents:
             if str(c).lower().find('bibtex')!=-1:
                 print thread.get_ident(), 'found bibtex link:', a
-    
+                #TODO: Do something with bibtex link
+                
     # search for ris link 
     for a in soup.findAll('a'):
+        if not a.has_key('href'):
+            continue
         href = a['href']
         if href.find('?')>0: href = href[ : href.find('?') ]
         if href.lower().endswith('.ris'):
@@ -665,19 +379,35 @@ def _import_unknown_citation(data, orig_url, paper=None):
             c = str(c).lower()
             if c.find('refworks')!=-1 or c.find('procite')!=-1 or c.find('refman')!=-1 or c.find('endnote')!=-1:
                 print thread.get_ident(), 'found ris link:', a
+                #TODO: Do something with bibtex link
     
     # search for pdf link
+    # TODO: If more than one link is found, present the choice to the user
+    pdf_link = None
     for a in soup.findAll('a'):
+        if pdf_link:
+            break
+        if not a.has_key('href'):
+            continue
         href = a['href']
         if href.find('?')>0: href = href[ : href.find('?') ]
         if href.lower().endswith('pdf'):
+            pdf_link = a['href']
             print thread.get_ident(), 'found pdf link:', a
             break
         for c in a.contents:
             c = str(c).lower()
             if c.find('pdf')!=-1:
                 print thread.get_ident(), 'found pdf link:', a
+                pdf_link = a['href']
+                break   
     
+    if pdf_link:
+        #Combine the base URL with the PDF link (necessary for relative URLs)
+        pdf_link = urlparse.urljoin(orig_url, pdf_link)
+        return import_citation(pdf_link)
+		
+
 
 def find_and_attach_pdf(paper, urls, visited_urls=set() ):
 
@@ -743,75 +473,3 @@ def find_and_attach_pdf(paper, urls, visited_urls=set() ):
                                 continue
                 if promising_links: print promising_links
                 if find_and_attach_pdf(paper, list(promising_links), visited_urls=visited_urls ): return
-            
-                
-        
-        
-    
-    
-    
-def _import_unknown_citation_old(params, orig_url, paper=None):
-    
-    if params['data'].startswith('%PDF'):
-
-        # we have a live one!
-        try:
-            filename = params['url'][ params['url'].rfind('/')+1 : ]
-            data = params['data']
-            print thread.get_ident(), 'importing paper =', filename
-            
-            if not paper:
-                md5_hexdigest = get_md5_hexdigest_from_data( data )
-                paper, created = get_or_create_paper_via( full_text_md5=md5_hexdigest )
-                if created:
-                    #paper.title = filename
-                    paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf', data )
-                    paper.import_url = orig_url
-                    paper.save()
-                    print thread.get_ident(), 'imported paper =', filename
-                else:
-                    print thread.get_ident(), 'paper already exists: paper =', paper.id, paper.doi, paper.title, paper.get_authors_in_order()
-            else:
-                paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf', data )
-                paper.import_url = orig_url
-                paper.save()
-        except:
-            traceback.print_exc()
-            if paper:
-                paper.delete()
-                paper = None
-    
-    else:
-    
-        # see 
-        try:
-            web_dir_root = params['url'][: params['url'].find('/',8) ]
-            web_dir_current = params['url'][: params['url'].rfind('/') ]
-            for a in p_html_a.findall( params['data'] ):
-                try: href = p_html_a_href.search(a).group(1)
-                except:
-                    print thread.get_ident(), 'couldn\'t figure out href from link:', a
-                    continue
-                # strip params
-                if href.find('?')>0:
-                    href = href[ : href.find('?') ]
-                # normalize to fully qualified name
-                if not href.lower().startswith('http'):
-                    if href.startswith('/'):
-                        href = web_dir_root + href
-                    else:
-                        href = web_dir_current +'/'+ href
-                if href.lower().endswith('.pdf'):
-                    print "href", href
-                    paper = _import_unknown_citation( openanything.fetch(href), orig_url, paper=paper )
-                    if paper:
-                        update_paper_from_bibtex_html( paper, params['data'] )
-                        paper.save()
-                        break
-        except:
-            traceback.print_exc()
-            if paper:
-                paper.delete()
-                paper = None
-    
-    return paper
