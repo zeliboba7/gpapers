@@ -80,23 +80,7 @@ import deseb
 from gPapers.models import *
 import importer
 from importer import pango_escape
-from importer import ACM_BASE_URL, IEEE_BASE_URL, html_strip, pango_escape, get_md5_hexdigest_from_data
-
-
-
-TEST_IMPORT_URLS = [
-    'http://citeseer.ist.psu.edu/mihalcea01highly.html',
-    'http://www.nature.com/nature/journal/v451/n7179/abs/nature06510.html;jsessionid=5AC0431F416BEBC6E380068E0F75B372',
-    'http://portal.acm.org/citation.cfm?id=1073445.1073467&coll=GUIDE&dl=ACM&CFID=15957474&CFTOKEN=97039722#',
-    'http://portal.acm.org/citation.cfm?id=1072064.1072107&coll=GUIDE&dl=ACM&CFID=15957143&CFTOKEN=75864759#',
-    'http://portal.acm.org/citation.cfm?id=1072228.1072395&coll=GUIDE&dl=ACM&CFID=15944519&CFTOKEN=43144202#',
-    'http://citeseer.ist.psu.edu/310506.html',
-    'http://portal.acm.org/citation.cfm?id=1073012.1073049&coll=GUIDE&dl=ACM&CFID=54110344&CFTOKEN=66049449',
-    'http://www.ncbi.nlm.nih.gov/pubmed/18260159?ordinalpos=1&itool=EntrezSystem2.PEntrez.Pubmed.Pubmed_ResultsPanel.Pubmed_RVDocSum',
-    'http://ieeexplore.ieee.org/search/srchabstract.jsp?arnumber=4252372&isnumber=4252351&punumber=16&k2dockey=4252372@ieeejrns&query=%28moldovan%29%3Cin%3Emetadata&pos=4',
-]
-
-
+from importer import html_strip, pango_escape, get_md5_hexdigest_from_data
 
 NOTE_ICON = gtk.gdk.pixbuf_new_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'note.png' ) )
 BOOKMARK_ICON = gtk.gdk.pixbuf_new_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'bookmark.png' ) )
@@ -454,7 +438,6 @@ class MainGUI:
         self.ui.get_widget('menuitem_import_file').connect('activate', self.import_file)
         self.ui.get_widget('menuitem_import_directory').connect('activate', self.import_directory)
         self.ui.get_widget('menuitem_preferences').connect('activate', lambda x: PreferencesGUI())
-        self.ui.get_widget('menuitem_import_test_urls').connect('activate', lambda x: fetch_citations_via_urls( TEST_IMPORT_URLS ) )
         self.ui.get_widget('menuitem_import_bibtex').connect('activate', self.import_bibtex)
         self.ui.get_widget('menuitem_author_graph').connect('activate', lambda x: self.graph_authors() )
         self.ui.get_widget('menuitem_paper_graph').connect('activate', lambda x: self.graph_papers() )
@@ -823,20 +806,7 @@ class MainGUI:
         self.left_pane_model.append( self.left_pane_model.get_iter((0),), ( '<i>most often read</i>', left_pane.render_icon(gtk.STOCK_DIALOG_INFO, gtk.ICON_SIZE_MENU), -3, False ) )
         self.left_pane_model.append( self.left_pane_model.get_iter((0),), ( '<i>never read</i>', gtk.gdk.pixbuf_new_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'applications-development.png' ) ), -5, False ) )
         self.left_pane_model.append( self.left_pane_model.get_iter((0),), ( '<i>highest rated</i>', gtk.gdk.pixbuf_new_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'emblem-favorite.png' ) ), -4, False ) )
-        self.left_pane_model.append( None, ( 'ACM', gtk.gdk.pixbuf_new_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'favicon_acm.ico' ) ), -1, False ) )
-        for playlist in Playlist.objects.filter(parent='1'):
-            if playlist.search_text:
-                icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
-            else:
-                icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
-            self.left_pane_model.append( self.left_pane_model.get_iter((1),), ( playlist.title, icon, playlist.id, True ) )
-        self.left_pane_model.append( None, ( 'IEEE', gtk.gdk.pixbuf_new_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'favicon_ieee.ico' ) ), -1, False  ) )
-        for playlist in Playlist.objects.filter(parent='2'):
-            if playlist.search_text:
-                icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
-            else:
-                icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
-            self.left_pane_model.append( self.left_pane_model.get_iter((2),), ( playlist.title, icon, playlist.id, True ) )
+        
         self.left_pane_model.append( None, ( 'PubMed', gtk.gdk.pixbuf_new_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'favicon_pubmed.ico' ) ), -1, False ) )
         for playlist in Playlist.objects.filter(parent='3'):
             if playlist.search_text:
@@ -844,20 +814,7 @@ class MainGUI:
             else:
                 icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
             self.left_pane_model.append( self.left_pane_model.get_iter((3),), ( playlist.title, icon, playlist.id, True ) )
-        self.left_pane_model.append( None, ( 'CiteSeer', gtk.gdk.pixbuf_new_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'favicon_citeseer.ico' ) ), -1, False ) )
-        for playlist in Playlist.objects.filter(parent='4'):
-            if playlist.search_text:
-                icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
-            else:
-                icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
-            self.left_pane_model.append( self.left_pane_model.get_iter((4),), ( playlist.title, icon, playlist.id, True ) )
-        self.left_pane_model.append( None, ( 'Google Scholar', gtk.gdk.pixbuf_new_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'favicon_google.ico' ) ), -1, False ) )
-        for playlist in Playlist.objects.filter(parent='5'):
-            if playlist.search_text:
-                icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
-            else:
-                icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
-            self.left_pane_model.append( self.left_pane_model.get_iter((5),), ( playlist.title, icon, playlist.id, True ) )
+
         left_pane.expand_all()
         self.ui.get_widget('left_pane').get_selection().select_path((0,))
 
@@ -914,16 +871,10 @@ class MainGUI:
             self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread( self.refresh_middle_pane_from_my_library, (True,) )
         else:
             self.ui.get_widget('my_library_filter_pane').hide()
+
         if rows[0][0]==1:
-            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread( self.refresh_middle_pane_from_acm, () )
-        if rows[0][0]==2:
-            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread( self.refresh_middle_pane_from_ieee, () )
-        if rows[0][0]==3:
             self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread( self.refresh_middle_pane_from_pubmed, () )
-        if rows[0][0]==4:
-            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread( self.refresh_middle_pane_from_citeseer, () )
-        if rows[0][0]==5:
-            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread( self.refresh_middle_pane_from_google_scholar, () )
+       
         self.select_middle_top_pane_item( self.ui.get_widget('middle_top_pane').get_selection() )
 
     def init_middle_top_pane(self):
@@ -1864,7 +1815,6 @@ class MainGUI:
             traceback.print_exc()
         if self.active_threads.has_key( thread.get_ident() ):
             del self.active_threads[ thread.get_ident() ]
-        
     
     def refresh_my_library_count(self):
         gtk.gdk.threads_enter()
@@ -1872,141 +1822,6 @@ class MainGUI:
         liststore, rows = selection.get_selected_rows()
         liststore.set_value( self.left_pane_model.get_iter((0,)), 0, '<b>My Library</b>  <span foreground="#888888">(%i)</span>' % Paper.objects.count() )
         gtk.gdk.threads_leave()
-    
-    def refresh_middle_pane_from_acm(self):
-        search_text = self.ui.get_widget('middle_pane_search').get_text().strip()
-        if not search_text: return
-        self.active_threads[ thread.get_ident() ] = 'searching acm... (%s)' % search_text
-        rows = []
-        try:
-            params = openanything.fetch( 'http://portal.acm.org/results.cfm?dl=ACM&query=%s' % defaultfilters.urlencode( search_text ) )
-            if params['status']==200 or params['status']==302:
-                soup = BeautifulSoup.BeautifulSoup( params['data'] )
-                parent_search_table_node = soup.find('div', attrs={'class':'authors'}).parent.parent.parent.parent.parent.parent
-                for node in parent_search_table_node.contents[0].findNextSiblings('tr'):
-                    node = node.find('table')
-                    tds = node.findAll('td')
-                    title = html_strip( tds[0].a.string )
-                    authors = html_strip( tds[0].div.string )
-                    if authors.find(','):
-                        first_author = authors[0:authors.find(',')]
-                    else:
-                        first_author = authors
-                    #print 'first_author', first_author
-                    import_url = ACM_BASE_URL +'/'+ node.find('a')['href']
-                    import_url_short = import_url[ 0: import_url.find('&') ]
-                    try:
-                        papers = list( Paper.objects.filter( title=title, authors__name__exact=first_author) )
-                        papers.extend( Paper.objects.filter(import_url__startswith=import_url_short) )
-                        paper = papers[0]
-                        paper_id = paper.id
-                        if paper.full_text and os.path.isfile( paper.full_text.path ):
-                            icon = self.ui.get_widget('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
-                        else:
-                            icon = None
-                    except:
-                        #traceback.print_exc()
-                        paper = None
-                        paper_id = -1
-                        icon = None
-                    row = ( 
-                        paper_id, # paper id 
-                        pango_escape( authors ), # authors 
-                        pango_escape( title ), # title 
-                        pango_escape( ' '.join( [html_strip(x.string).replace('\n','').replace('\r','').replace('\t','') for x in tds[3].div.contents if len(html_strip(x.string).replace('\n','').replace('\r','').replace('\t',''))] ) ), # journal 
-                        pango_escape( html_strip( tds[1].string )[-4:] ), # year 
-                        0, # ranking
-                        ' '.join( [html_strip(x.string).replace('\n','').replace('\r','').replace('\t','') for x in tds[-1].findAll() if x.string] ), # abstract
-                        icon, # icon
-                        import_url, # import_url
-                        '', # doi
-                        '', # created
-                        '', # updated
-                        '', # empty_str
-                        '', # pubmed_id
-                    )
-                    #print thread.get_ident(), 'row =', row
-                    rows.append( row )
-                self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
-            else:
-                gtk.gdk.threads_enter()
-                error = gtk.MessageDialog( type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL )
-                #error.connect('response', lambda x,y: error.destroy())
-                error.set_markup('<b>Unable to Search External Repository</b>\n\nHTTP Error code: %i' % params['status'])
-                error.run()
-                gtk.gdk.threads_leave()
-        except:
-            traceback.print_exc()
-        if self.active_threads.has_key( thread.get_ident() ):
-            del self.active_threads[ thread.get_ident() ]
-            
-    def refresh_middle_pane_from_ieee(self):
-        search_text = self.ui.get_widget('middle_pane_search').get_text().strip()
-        if not search_text: return
-        self.active_threads[ thread.get_ident() ] = 'searching ieee... (%s)' % search_text
-        rows = []
-        try:
-            params = openanything.fetch( 'http://ieeexplore.ieee.org/search/freesearchresult.jsp?history=yes&queryText=%%28%s%%29&imageField.x=0&imageField.y=0' % defaultfilters.urlencode( search_text ) )
-            if params['status']==200 or params['status']==302:
-                soup = BeautifulSoup.BeautifulSoup( params['data'].replace('<!-BMS End-->','') )
-                print soup.prettify()
-                for node in soup.findAll( 'td', attrs={'class':'bodyCopyBlackLarge'} ):
-                    try:
-                        tds = node.findAll( 'td', attrs={'class':'bodyCopyBlackLargeSpaced'} )
-                        title = html_strip( tds[1].strong.string )
-                        #print 'tds[1].contents', tds[1].contents
-                        authors = html_strip( tds[1].contents[2].string )
-                        if authors.find(';'):
-                            first_author = authors[0:authors.find(';')]
-                        else:
-                            first_author = authors
-                        #print 'first_author', first_author
-                        try:
-                            paper = Paper.objects.get( title=title )
-                            paper_id = paper.id
-                            if paper.full_text and os.path.isfile( paper.full_text.path ):
-                                icon = self.ui.get_widget('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
-                            else:
-                                icon = None
-                        except:
-                            #traceback.print_exc()
-                            paper = None
-                            paper_id = -1
-                            icon = None
-                        row = ( 
-                            paper_id, # paper id 
-                            pango_escape( authors ), # authors 
-                            pango_escape( title ), # title 
-                            pango_escape( html_strip( tds[1].contents[5].string ) ), # journal 
-                            '', # year 
-                            0, # ranking
-                            '', # abstract
-                            icon, # icon
-                            IEEE_BASE_URL + node.findAll('a', attrs={'class':'bodyCopySpaced'})[0]['href'], # import_url
-                            '', # doi
-                            '', # created
-                            '', # updated
-                            '', # empty_str
-                            '', # pubmed_id
-                        )
-                        #print thread.get_ident(), 'row =', row
-                        rows.append( row )
-                    except: 
-                        pass
-                        #traceback.print_exc()
-                    
-                self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
-            else:
-                gtk.gdk.threads_enter()
-                error = gtk.MessageDialog( type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL )
-                error.connect('response', lambda x,y: error.destroy())
-                error.set_markup('<b>Unable to Search External Repository</b>\n\nHTTP Error code: %i' % params['status'])
-                error.run()
-                gtk.gdk.threads_leave()
-        except:
-            traceback.print_exc()
-        if self.active_threads.has_key( thread.get_ident() ):
-            del self.active_threads[ thread.get_ident() ]
 
     def refresh_middle_pane_from_pubmed(self):
         search_text = self.ui.get_widget('middle_pane_search').get_text().strip()
@@ -2104,143 +1919,6 @@ class MainGUI:
             traceback.print_exc()
         if self.active_threads.has_key( thread.get_ident() ):
             del self.active_threads[ thread.get_ident() ]
-
-    def refresh_middle_pane_from_citeseer(self):
-        search_text = self.ui.get_widget('middle_pane_search').get_text().strip()
-        if not search_text: return
-        self.active_threads[ thread.get_ident() ] = 'searching citeseer... (%s)' % search_text
-        rows = []
-        try:
-            params = openanything.fetch( 'http://citeseer.ist.psu.edu/cis?q=%s&cs=1&am=50' % defaultfilters.urlencode( search_text ) )
-            if params['status']==200 or params['status']==302:
-                for html in params['data'][ params['data'].find('<!--RLS-->')+20 : params['data'].find('<!--RLE-->') ].split('<!--RIS-->'):
-                    node = BeautifulSoup.BeautifulStoneSoup( html.replace('<b>','').replace('</b>','') )
-                    try:
-                        title_authors_year = node.findAll('a')[0].string
-                        o = re.search( '(.*) - (.*) [(](.*)[)]', title_authors_year )
-                        title = html_strip( o.group(1) )
-                        authors = html_strip( o.group(2) )
-                        year = html_strip( o.group(3) )
-                        import_url = node.findAll('a')[0]['href']
-                        try:
-                            papers = list( Paper.objects.filter( import_url=import_url ) )
-                            papers.extend( Paper.objects.filter( title=title, authors__name__contains=authors.split(', ')[0] ) )
-                            paper = papers[0]
-                            paper_id = paper.id
-                            if paper.full_text and os.path.isfile( paper.full_text.path ):
-                                icon = self.ui.get_widget('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
-                            else:
-                                icon = None
-                        except:
-                            #traceback.print_exc()
-                            paper = None
-                            paper_id = -1
-                            icon = None
-                        try: journal = html_strip( node2.findAll('a')[0].string )
-                        except: journal = ''
-                        try: doi = html_strip( node.find('ArticleId', IdType='doi').string )
-                        except: doi = ''
-                        try: abstract = html_strip( node2.find('p', attrs={'class':'abstract'}).string )
-                        except: abstract = ''
-                        row = ( 
-                            paper_id, # paper id 
-                            pango_escape( authors ), # authors 
-                            pango_escape( title ), # title 
-                            pango_escape( journal ), # journal 
-                            pango_escape( year ), # year 
-                            0, # ranking
-                            abstract, # abstract
-                            icon, # icon
-                            import_url, # import_url
-                            doi, # doi
-                            '', # created
-                            '', # updated
-                            '', # empty_str
-                            '', # pubmed_id
-                        )
-                        rows.append( row )
-                    except: 
-                        #pass
-                        traceback.print_exc()
-                    
-                self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
-        except:
-            traceback.print_exc()
-        if self.active_threads.has_key( thread.get_ident() ):
-            del self.active_threads[ thread.get_ident() ]
-
-    def refresh_middle_pane_from_google_scholar(self):
-        search_text = self.ui.get_widget('middle_pane_search').get_text().strip()
-        if not search_text: return
-        self.active_threads[ thread.get_ident() ] = 'searching google scholar... (%s)' % search_text
-        rows = []
-        try:
-            response = urllib.urlopen( 'http://scholar.google.com/scholar?q=%s' % urllib.quote_plus(search_text))
-            if response.getcode() == 200 or response.getcode()==302:                    
-                node = BeautifulSoup.BeautifulStoneSoup(node)
-                #print node.prettify()
-                try:
-                    title = html_strip( node.findAll('a')[0].string )
-                    year = ''
-                    import_url = node.findAll('a')[0]['href']
-                    for a in node.findAll('a',attrs={'class':'fl'}):
-                        if a['href'].find('cluster')!=-1:
-                            import_url = a['href']
-                    if not import_url.startswith('http'):
-                        import_url = 'http://scholar.google.com'+ import_url
-                    try:
-                        papers = list( Paper.objects.filter( import_url=import_url ) )
-                        papers.extend( Paper.objects.filter( title=title ) )
-                        paper = papers[0]
-                        paper_id = paper.id
-                        if paper.full_text and os.path.isfile( paper.full_text.path ):
-                            icon = self.ui.get_widget('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
-                        else:
-                            icon = None
-                    except:
-                        #traceback.print_exc()
-                        paper = None
-                        paper_id = -1
-                        icon = None
-                    
-                    #x = node.findAll('span', attrs={'class':'a'})[0].split('-')
-                    x = html_strip(node.findAll('span', attrs={'class':'a'})[0]).split('-')
-                    try: authors = x[0].strip()
-                    except: authors = ''
-                    try: journal = x[1].strip()
-                    except: journal = ''
-                    try: abstract = '\n'.join( [ html_strip(x) for x in node.findAll('br')[1:] ] )
-                    except: abstract = ''
-                    row = ( 
-                        paper_id, # paper id 
-                        pango_escape( authors ), # authors 
-                        pango_escape( title ), # title 
-                        pango_escape( journal ), # journal 
-                        pango_escape( year ), # year 
-                        0, # ranking
-                        abstract, # abstract
-                        icon, # icon
-                        import_url, # import_url
-                        '', # doi
-                        '', # created
-                        '', # updated
-                        '', # empty_str
-                        '', # pubmed_id
-                    )
-                    rows.append( row )
-                except: 
-                    #pass
-                    traceback.print_exc()
-                
-                self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
-            else:
-                show_html_error_dialog(response.getcode())
-        except:
-            traceback.print_exc()
-        if self.active_threads.has_key( thread.get_ident() ):
-            del self.active_threads[ thread.get_ident() ]
-
-
 
 class AuthorEditGUI:
     def __init__(self, author_id, callback_on_save=None):
