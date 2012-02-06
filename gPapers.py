@@ -1850,21 +1850,25 @@ class MainGUI:
         rows = []
         try:
             papers = pubmed.search(search_text)
-            for paper in papers:        
-                try:
-                    existing_paper = Paper.objects.get(pubmed_id=pubmed_id)
+            for info in papers:        
+                try:                    
+                    existing_paper = Paper.objects.filter(pubmed_id=info['pubmed_id'])
+                    if not existing_paper:
+                        raise Paper.DoesNotExist()
+                    existing_paper = existing_paper[0]
+                    info['id'] = existing_paper.id
+                    info['created'] = existing_paper.created
+                    info['updated'] = existing_paper.updated
                     if existing_paper.full_text and \
                                os.path.isfile(existing_paper.full_text.path):
-                        icon = self.ui.get_widget('middle_top_pane').\
+                        info['icon'] = self.ui.get_widget('middle_top_pane').\
                                         render_icon(gtk.STOCK_DND,
                                         gtk.ICON_SIZE_MENU)
-                    else:
-                        icon = None
-                except:
-                    icon = None 
+                except Paper.DoesNotExist:
+                    pass
                                
                 # Add information to table 
-                rows.append(row_from_paper_object(paper))
+                rows.append(row_from_dictionary(info))
                         
             self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
         except:
