@@ -45,42 +45,43 @@ def search(search_text):
     documents = parsed_response.esummaryresult.findAll('docsum') 
     papers = []
     for document in documents:    
+        info = {}
         # Extract information
-        pubmed_id = document.id.string        
+        info['pubmed_id'] = str(document.id.string)        
+
         doi = document.findAll('item', {'name' : 'doi'})
         import_url = ''
         if doi:
-            doi = doi[0].string
-            import_url = 'http://dx.doi.org/' + doi
+            info['doi'] = doi[0].string
+            info['import_url'] = 'http://dx.doi.org/' + info['doi']
+            
         title = document.findAll('item', {'name' : 'Title'})[0].string
         authors = document.findAll('item', {'name' : 'Author'})
             
-        journal = document.findAll('item',
-                                   {'name' : 'FullJournalName'})[0].string
-
-        #TODO: How to handle publication date?                                    
-        #pubdate = document.findAll('item', {'name' : 'PubDate'})[0]                                   
-
-        try:
-            source = Source.objects.get(name=journal)
-        except Source.DoesNotExist:
-            source = Source(name=journal)
-        
+        info['title'] = document.findAll('item', {'name' : 'Title'})[0].string
+        info['authors'] = [str(author.string) for author in \
+                                  document.findAll('item', {'name' : 'Author'})]            
+        info['journal'] = document.findAll('item',
+                                          {'name' : 'FullJournalName'})[0].string
+                                            
+        pubdate = document.findAll('item', {'name' : 'PubDate'})
+        if pubdate and pubdate[0]:
+            info['year'] = pubdate[0].string[:4]
         
         #TODO: Retrieve abstract
         abstract = ''
 
         paper = Paper(doi=doi, pubmed_id=pubmed_id, import_url=import_url,
                       title=title, source=source)
+        author_list = []
         for author in authors:
             try:
                 author_obj = Author.objects.get(name=author.string)
             except Author.DoesNotExist:
                 author_obj = Author(name=author.string)
-            #FIXME: This does not work for not yet existing papers
-            paper.authors.add(author_obj)
+            author_list.append(author_obj)
             
-        papers.append(paper)
+        papers.append(info)
 
     return papers
         
