@@ -287,34 +287,24 @@ def show_html_error_dialog(code):
     error.run()
     gtk.gdk.threads_leave()
 
-def row_from_paper_object(paper, authors, icon=None):
-    assert paper is not None
-
-    if paper.source:
-        journal = paper.source.name
-    else:
-        journal = ''
-
-    if paper.id:
-        paper_id = paper.id
-    else:
-        paper_id = -1
+def row_from_dictionary(info):
+    assert info is not None
         
     row = ( 
-            paper_id, # paper id 
-            pango_escape(', '.join([author.name for author in authors]) ), # authors 
-            pango_escape(paper.title), # title 
-            pango_escape(journal), # journal 
-            'XXXX', # year 
-            paper.rating, # ranking
-            paper.abstract, # abstract
-            icon, # icon
-            paper.import_url, # import_url
-            paper.doi, # doi
-            paper.created, # created
-            paper.updated, # updated
+            info.get('id', -1), # paper id 
+            pango_escape(', '.join([author for author in info.get('authors')]) ), # authors 
+            pango_escape(info.get('title')), # title 
+            pango_escape(info.get('journal')), # journal 
+            info.get('year'), # year 
+            info.get('rating', 0), # ranking
+            info.get('abstract'), # abstract
+            info.get('icon'), # icon
+            info.get('import_url'), # import_url
+            info.get('doi'), # doi
+            info.get('created'), # created
+            info.get('updated'), # updated
             '', # empty_str
-            paper.pubmed_id, # pubmed_id
+            info.get('pubmed_id'), # pubmed_id
     )
 
     return row
@@ -1860,7 +1850,7 @@ class MainGUI:
         rows = []
         try:
             papers = pubmed.search(search_text)
-            for paper, authors in papers:        
+            for paper in papers:        
                 try:
                     existing_paper = Paper.objects.get(pubmed_id=pubmed_id)
                     if existing_paper.full_text and \
@@ -1874,7 +1864,7 @@ class MainGUI:
                     icon = None 
                                
                 # Add information to table 
-                rows.append(row_from_paper_object(paper, authors))
+                rows.append(row_from_paper_object(paper))
                         
             self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
         except:
