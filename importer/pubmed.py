@@ -10,8 +10,8 @@ ESUMMARY_QUERY = 'esummary.fcgi?db=pubmed&query_key=%s&WebEnv=%s'
 
 def search(search_text):
     '''
-    Returns a list of (Paper, authors) tuples (where authors is a list of Author
-    instances): The PUBMED results for the given search query
+    Returns a list of dictionaries: The PUBMED results for the given search
+    query
     '''
 
     if not search_text:
@@ -45,31 +45,25 @@ def search(search_text):
     documents = parsed_response.esummaryresult.findAll('docsum') 
     papers = []
     for document in documents:    
+        info = {}
         # Extract information
-        pubmed_id = str(document.id.string)        
+        info['pubmed_id'] = str(document.id.string)        
 
         doi = document.findAll('item', {'name' : 'doi'})
+        import_url = ''
         if doi:
-            doi = doi[0].string
-            import_url = 'http://dx.doi.org/' + doi
-        else:
-            doi = ''
-            import_url = ''
+            info['doi'] = doi[0].string
+            info['import_url'] = 'http://dx.doi.org/' + info['doi']
             
-        title = document.findAll('item', {'name' : 'Title'})[0].string
-        authors = document.findAll('item', {'name' : 'Author'})
-            
-        journal = document.findAll('item',
-                                   {'name' : 'FullJournalName'})[0].string
-
-        #TODO: How to handle publication date?                                    
-        #pubdate = document.findAll('item', {'name' : 'PubDate'})[0]                                   
-
-        try:
-            source = Source.objects.get(name=journal)
-        except Source.DoesNotExist:
-            source = Source(name=journal)
-        
+        info['title'] = document.findAll('item', {'name' : 'Title'})[0].string
+        info['authors'] = [str(author.string) for author in \
+                                  document.findAll('item', {'name' : 'Author'})]            
+        info['journal'] = document.findAll('item',
+                                          {'name' : 'FullJournalName'})[0].string
+                                            
+        pubdate = document.findAll('item', {'name' : 'PubDate'})
+        if pubdate and pubdate[0]:
+            info['year'] = pubdate[0].string[:4]
         
         #TODO: Retrieve abstract
         abstract = ''
@@ -84,7 +78,7 @@ def search(search_text):
                 author_obj = Author(name=author.string)
             author_list.append(author_obj)
             
-        papers.append((paper, author_list))
+        papers.append(info)
 
     return papers
         
