@@ -10,7 +10,7 @@ ESUMMARY_QUERY = 'esummary.fcgi?db=pubmed&query_key=%s&WebEnv=%s'
 
 def search(search_text):
     '''
-    Returns a list of Paper objects: The PUBMED results for the given search
+    Returns a list of dictionaries: The PUBMED results for the given search
     query
     '''
 
@@ -54,9 +54,6 @@ def search(search_text):
         if doi:
             info['doi'] = doi[0].string
             info['import_url'] = 'http://dx.doi.org/' + info['doi']
-            
-        title = document.findAll('item', {'name' : 'Title'})[0].string
-        authors = document.findAll('item', {'name' : 'Author'})
             
         info['title'] = document.findAll('item', {'name' : 'Title'})[0].string
         info['authors'] = [str(author.string) for author in \
