@@ -67,16 +67,6 @@ def search(search_text):
         
         #TODO: Retrieve abstract
         abstract = ''
-
-        paper = Paper(doi=doi, pubmed_id=pubmed_id, import_url=import_url,
-                      title=title, source=source)
-        author_list = []
-        for author in authors:
-            try:
-                author_obj = Author.objects.get(name=author.string)
-            except Author.DoesNotExist:
-                author_obj = Author(name=author.string)
-            author_list.append(author_obj)
             
         papers.append(info)
 
