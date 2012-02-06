@@ -287,30 +287,27 @@ def show_html_error_dialog(code):
     error.run()
     gtk.gdk.threads_leave()
 
-def row_from_paper_object(paper, icon=None):
-    assert paper is not None
-
-    if paper.source:
-        journal = paper.source.name
-    else:
-        journal = ''
+def row_from_dictionary(info):
+    assert info is not None
         
-    return ( 
-            paper.id, # paper id 
-            pango_escape(', '.join([author.name for author in paper.authors.all()]) ), # authors 
-            pango_escape(paper.title), # title 
-            pango_escape(journal), # journal 
-            'XXXX', # year 
-            paper.rating, # ranking
-            paper.abstract, # abstract
-            icon, # icon
-            paper.import_url, # import_url
-            paper.doi, # doi
-            paper.created, # created
-            paper.updated, # updated
+    row = ( 
+            info.get('id', -1), # paper id 
+            pango_escape(', '.join([author for author in info.get('authors')]) ), # authors 
+            pango_escape(info.get('title')), # title 
+            pango_escape(info.get('journal')), # journal 
+            info.get('year'), # year 
+            info.get('rating', 0), # ranking
+            info.get('abstract'), # abstract
+            info.get('icon'), # icon
+            info.get('import_url'), # import_url
+            info.get('doi'), # doi
+            info.get('created'), # created
+            info.get('updated'), # updated
             '', # empty_str
-            paper.pubmed_id, # pubmed_id
+            info.get('pubmed_id'), # pubmed_id
     )
+
+    return row
     
 class MainGUI:
     
