@@ -287,17 +287,22 @@ def show_html_error_dialog(code):
     error.run()
     gtk.gdk.threads_leave()
 
-def row_from_paper_object(paper, icon=None):
+def row_from_paper_object(paper, authors, icon=None):
     assert paper is not None
 
     if paper.source:
         journal = paper.source.name
     else:
         journal = ''
+
+    if paper.id:
+        paper_id = paper.id
+    else:
+        paper_id = -1
         
-    return ( 
-            paper.id, # paper id 
-            pango_escape(', '.join([author.name for author in paper.authors.all()]) ), # authors 
+    row = ( 
+            paper_id, # paper id 
+            pango_escape(', '.join([author.name for author in authors]) ), # authors 
             pango_escape(paper.title), # title 
             pango_escape(journal), # journal 
             'XXXX', # year 
@@ -311,6 +316,8 @@ def row_from_paper_object(paper, icon=None):
             '', # empty_str
             paper.pubmed_id, # pubmed_id
     )
+
+    return row
     
 class MainGUI:
     
@@ -1853,7 +1860,7 @@ class MainGUI:
         rows = []
         try:
             papers = pubmed.search(search_text)
-            for paper in papers:        
+            for paper, authors in papers:        
                 try:
                     existing_paper = Paper.objects.get(pubmed_id=pubmed_id)
                     if existing_paper.full_text and \
@@ -1867,7 +1874,7 @@ class MainGUI:
                     icon = None 
                                
                 # Add information to table 
-                rows.append(row_from_paper_object(paper))
+                rows.append(row_from_paper_object(paper, authors))
                         
             self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
         except:

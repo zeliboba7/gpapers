@@ -10,8 +10,8 @@ ESUMMARY_QUERY = 'esummary.fcgi?db=pubmed&query_key=%s&WebEnv=%s'
 
 def search(search_text):
     '''
-    Returns a list of Paper objects: The PUBMED results for the given search
-    query
+    Returns a list of (Paper, authors) tuples (where authors is a list of Author
+    instances): The PUBMED results for the given search query
     '''
 
     if not search_text:
@@ -46,12 +46,16 @@ def search(search_text):
     papers = []
     for document in documents:    
         # Extract information
-        pubmed_id = document.id.string        
+        pubmed_id = str(document.id.string)        
+
         doi = document.findAll('item', {'name' : 'doi'})
-        import_url = ''
         if doi:
             doi = doi[0].string
             import_url = 'http://dx.doi.org/' + doi
+        else:
+            doi = ''
+            import_url = ''
+            
         title = document.findAll('item', {'name' : 'Title'})[0].string
         authors = document.findAll('item', {'name' : 'Author'})
             
@@ -72,15 +76,15 @@ def search(search_text):
 
         paper = Paper(doi=doi, pubmed_id=pubmed_id, import_url=import_url,
                       title=title, source=source)
+        author_list = []
         for author in authors:
             try:
                 author_obj = Author.objects.get(name=author.string)
             except Author.DoesNotExist:
                 author_obj = Author(name=author.string)
-            #FIXME: This does not work for not yet existing papers
-            paper.authors.add(author_obj)
+            author_list.append(author_obj)
             
-        papers.append(paper)
+        papers.append((paper, author_list))
 
     return papers
         
