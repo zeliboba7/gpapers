@@ -35,6 +35,9 @@ from pyPdf import PdfFileReader
 from gPapers.models import *
 from django.template import defaultfilters
 import BeautifulSoup, openanything
+
+from utils import *
+
 active_threads = None
 
 p_bibtex = re.compile( '[@][a-z]+[\s]*{([^<]*)}', re.IGNORECASE | re.DOTALL )
@@ -190,9 +193,9 @@ def update_paper_from_bibtex_html( paper, html ):
         if not paper:
             paper, created = get_or_create_paper_via( doi=bibtex.get('doi'), title=bibtex.get('title') )
             if created:
-                print thread.get_ident(), 'creating paper:', paper
+                log_info('importer', 'creating paper: %s' % str(paper))
             else:
-                print thread.get_ident(), 'updating paper:', paper
+                log_info('importer', 'updating paper: %s' % str(paper))
 
         if bibtex.get('doi'): paper.doi = bibtex.get('doi','')
         if bibtex.get('title'): paper.title = bibtex.get('title','')
@@ -235,7 +238,7 @@ def update_paper_from_bibtex_html( paper, html ):
 
         paper.bibtex = match.group(0)
         paper.save()
-        print thread.get_ident(), 'imported bibtex =', bibtex
+        log_info('importer', 'imported bibtex: %s' % bibtex)
 
     return paper
 
@@ -245,13 +248,8 @@ def import_citation(url, paper=None, callback=None):
     active_threads[ thread.get_ident() ] = 'importing: '+ url
     try:
         response = urllib.urlopen(url)
-        if response.getcode()!=200 and response.getcode()!=302:
-            print thread.get_ident(), 'unable to download: %s  (%i)' % ( url, response.getcode() )
-#            gtk.gdk.threads_enter()
-#            error = gtk.MessageDialog( type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL )
-#            error.set_markup('<b>Unable to Download Paper</b>\n\nThe following url:\n<i>%s</i>\n\nreturned the HTTP error code: %i' % ( url.replace('&', '&amp;'), params['status'] ))
-#            error.run()
-#            gtk.gdk.threads_leave()
+        if response.getcode() != 200 and response.getcode() != 302:
+            log_error('importer', 'unable to download: %s  (%i)' % ( url, response.getcode()))
             return
 
         data = response.read(-1)
@@ -273,7 +271,7 @@ def import_citation(url, paper=None, callback=None):
                         filename = query[key].lower() # found a .pdf name
                         break
             
-            print thread.get_ident(), 'importing paper =', filename
+            log_info('importer', 'importing paper: %s' % filename)
 
             if not paper:
                 md5_hexdigest = get_md5_hexdigest_from_data(data)
@@ -286,12 +284,9 @@ def import_citation(url, paper=None, callback=None):
                                     data)
                     paper.import_url = response.geturl()
                     paper.save()
-                    print thread.get_ident(), 'imported paper =', filename
+                    log_info('importer', 'imported paper: %s' % filename)
                 else:
-                    print thread.get_ident(),\
-                            'paper already exists: paper =', paper.id, paper.doi,\
-                                                             paper.title,\
-                                                             paper.get_authors_in_order()
+                    log_info('importer', 'paper already exists: %s' % str(paper))
             else:
                 paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf',
                                  local_file.read())
@@ -323,9 +318,9 @@ def import_citation(url, paper=None, callback=None):
         del active_threads[ thread.get_ident() ]
 
 def _import_google_scholar_citation(params, paper=None):
-    print thread.get_ident(), 'downloading google scholar citation:', params['url']
+    log_info('importer', 'downloading google scholar citation: %s' % params['url'])
     try:
-        print thread.get_ident(), 'parsing...'
+        log_debug('importer', 'parsing...')
         soup = BeautifulSoup.BeautifulSoup( params['data'] )
 
         # search for bibtex link
@@ -333,7 +328,7 @@ def _import_google_scholar_citation(params, paper=None):
             for a in soup.findAll('a'):
                 for c in a.contents:
                     if str(c).lower().find('bibtex')!=-1:
-                        print thread.get_ident(), 'found bibtex link:', a
+                        log_info('importer', 'found bibtex link: %s' % a)
                         params_bibtex = openanything.fetch( 'http://scholar.google.com'+a['href'] )
                         if params_bibtex['status']==200 or params_bibtex['status']==302:
                             paper = update_paper_from_bibtex_html( paper, params_bibtex['data'] )
@@ -342,7 +337,7 @@ def _import_google_scholar_citation(params, paper=None):
 
         find_and_attach_pdf( paper, urls=[ x['href'] for x in soup.findAll('a', onmousedown=True) ] )
 
-        print thread.get_ident(), 'imported paper =', paper.id, paper.doi, paper.title, paper.get_authors_in_order()
+        log_info('importer', 'imported paper: %s' % str(paper))
         return paper
     except:
         traceback.print_exc()
@@ -352,8 +347,6 @@ p_html_a_href = re.compile( '''href *= *['"]([^'^"]+)['"]''' , re.IGNORECASE)
 
 def _import_unknown_citation(data, orig_url, paper=None):
 
-    print 'orig_url: ', orig_url
-
     # soupify
     soup = BeautifulSoup.BeautifulSoup( data )
 
@@ -361,7 +354,7 @@ def _import_unknown_citation(data, orig_url, paper=None):
     for a in soup.findAll('a'):
         for c in a.contents:
             if str(c).lower().find('bibtex')!=-1:
-                print thread.get_ident(), 'found bibtex link:', a
+                log_info('importer', 'found bibtex link: %s' % a)
                 #TODO: Do something with bibtex link
 
     # search for ris link
@@ -371,12 +364,12 @@ def _import_unknown_citation(data, orig_url, paper=None):
         href = a['href']
         if href.find('?')>0: href = href[ : href.find('?') ]
         if href.lower().endswith('.ris'):
-            print thread.get_ident(), 'found ris link:', a
+            log_info('importer', 'found RIS link: %s' % a)
             break
         for c in a.contents:
             c = str(c).lower()
             if c.find('refworks')!=-1 or c.find('procite')!=-1 or c.find('refman')!=-1 or c.find('endnote')!=-1:
-                print thread.get_ident(), 'found ris link:', a
+                log_info('importer', 'found RIS link: %s' % a)
                 #TODO: Do something with ris link
 
     # search for pdf link
@@ -393,12 +386,12 @@ def _import_unknown_citation(data, orig_url, paper=None):
         if href.find('?')>0: href = href[ : href.find('?') ]
         if href.lower().endswith('pdf'):
             pdf_link = a['href']
-            print thread.get_ident(), 'found pdf link:', a
+            log_info('importer', 'found PDF link: %s' % a)
             break
         for c in a.contents:
             c = str(c).lower()
             if c.find('pdf')!=-1:
-                print thread.get_ident(), 'found pdf link:', a
+                log_info('importer', 'found PDF link: %s' % a)
                 pdf_link = a['href']
                 break
 
@@ -415,7 +408,7 @@ def find_and_attach_pdf(paper, urls, visited_urls=set() ):
     for url in urls:
         if url.find('?')>0: url = url[ : url.find('?') ]
         if url.lower().endswith('pdf'):
-            print thread.get_ident(), 'found pdf link:', url
+            log_info('importer', 'found PDF link: %s' % url)
             visited_urls.add(url)
             params = openanything.fetch(url)
             if params['status']==200 or params['status']==302 :
@@ -423,7 +416,7 @@ def find_and_attach_pdf(paper, urls, visited_urls=set() ):
                     # we have a live one!
                     try:
                         filename = params['url'][ params['url'].rfind('/')+1 : ]
-                        print thread.get_ident(), 'importing paper =', filename
+                        log_info('importer', 'importing paper: %s' % filename)
                         paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf', params['data'] )
                         paper.save()
                         return True
@@ -438,7 +431,7 @@ def find_and_attach_pdf(paper, urls, visited_urls=set() ):
                 # we have a live one!
                 try:
                     filename = params['url'][ params['url'].rfind('/')+1 : ]
-                    print thread.get_ident(), 'importing paper =', filename
+                    log_info('importer', 'importing paper: %s' % filename)
                     paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf', params['data'] )
                     paper.save()
                     return True
@@ -461,14 +454,14 @@ def find_and_attach_pdf(paper, urls, visited_urls=set() ):
                     if x.find('?')>0: x = x[ : x.find('?') ]
                     if x.lower().endswith('pdf'):
                         if href not in visited_urls:
-                            print thread.get_ident(), 'found pdf link:', a
+                            log_info('importer', 'found PDF link: %s' % a)
                             promising_links.add( href )
                             continue
                     for c in a.contents:
                         c = str(c).lower()
                         if c.find('pdf')!=-1:
                             if href not in visited_urls:
-                                print thread.get_ident(), 'found pdf link:', a
+                                log_info('importer', 'found PDF link: %s' % a)
                                 promising_links.add( href )
                                 continue
                 if promising_links: print promising_links
