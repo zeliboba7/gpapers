@@ -193,9 +193,9 @@ def update_paper_from_bibtex_html( paper, html ):
         if not paper:
             paper, created = get_or_create_paper_via( doi=bibtex.get('doi'), title=bibtex.get('title') )
             if created:
-                log_info('importer', 'creating paper: %s' % str(paper))
+                log_info('creating paper: %s' % str(paper))
             else:
-                log_info('importer', 'updating paper: %s' % str(paper))
+                log_info('updating paper: %s' % str(paper))
 
         if bibtex.get('doi'): paper.doi = bibtex.get('doi','')
         if bibtex.get('title'): paper.title = bibtex.get('title','')
@@ -238,7 +238,7 @@ def update_paper_from_bibtex_html( paper, html ):
 
         paper.bibtex = match.group(0)
         paper.save()
-        log_info('importer', 'imported bibtex: %s' % bibtex)
+        log_info('imported bibtex: %s' % bibtex)
 
     return paper
 
@@ -249,7 +249,7 @@ def import_citation(url, paper=None, callback=None):
     try:
         response = urllib.urlopen(url)
         if response.getcode() != 200 and response.getcode() != 302:
-            log_error('importer', 'unable to download: %s  (%i)' % ( url, response.getcode()))
+            log_error('unable to download: %s  (%i)' % ( url, response.getcode()))
             return
 
         data = response.read(-1)
@@ -271,7 +271,7 @@ def import_citation(url, paper=None, callback=None):
                         filename = query[key].lower() # found a .pdf name
                         break
             
-            log_info('importer', 'importing paper: %s' % filename)
+            log_info('importing paper: %s' % filename)
 
             if not paper:
                 md5_hexdigest = get_md5_hexdigest_from_data(data)
@@ -284,9 +284,9 @@ def import_citation(url, paper=None, callback=None):
                                     data)
                     paper.import_url = response.geturl()
                     paper.save()
-                    log_info('importer', 'imported paper: %s' % filename)
+                    log_info('imported paper: %s' % filename)
                 else:
-                    log_info('importer', 'paper already exists: %s' % str(paper))
+                    log_info('paper already exists: %s' % str(paper))
             else:
                 paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf',
                                  local_file.read())
@@ -318,9 +318,9 @@ def import_citation(url, paper=None, callback=None):
         del active_threads[ thread.get_ident() ]
 
 def _import_google_scholar_citation(params, paper=None):
-    log_info('importer', 'downloading google scholar citation: %s' % params['url'])
+    log_info('downloading google scholar citation: %s' % params['url'])
     try:
-        log_debug('importer', 'parsing...')
+        log_debug('parsing...')
         soup = BeautifulSoup.BeautifulSoup( params['data'] )
 
         # search for bibtex link
@@ -328,7 +328,7 @@ def _import_google_scholar_citation(params, paper=None):
             for a in soup.findAll('a'):
                 for c in a.contents:
                     if str(c).lower().find('bibtex')!=-1:
-                        log_info('importer', 'found bibtex link: %s' % a)
+                        log_debug('found bibtex link: %s' % a)
                         params_bibtex = openanything.fetch( 'http://scholar.google.com'+a['href'] )
                         if params_bibtex['status']==200 or params_bibtex['status']==302:
                             paper = update_paper_from_bibtex_html( paper, params_bibtex['data'] )
@@ -337,7 +337,7 @@ def _import_google_scholar_citation(params, paper=None):
 
         find_and_attach_pdf( paper, urls=[ x['href'] for x in soup.findAll('a', onmousedown=True) ] )
 
-        log_info('importer', 'imported paper: %s' % str(paper))
+        log_info('imported paper: %s' % str(paper))
         return paper
     except:
         traceback.print_exc()
@@ -354,7 +354,7 @@ def _import_unknown_citation(data, orig_url, paper=None):
     for a in soup.findAll('a'):
         for c in a.contents:
             if str(c).lower().find('bibtex')!=-1:
-                log_info('importer', 'found bibtex link: %s' % a)
+                log_debug('found bibtex link: %s' % a)
                 #TODO: Do something with bibtex link
 
     # search for ris link
@@ -364,12 +364,12 @@ def _import_unknown_citation(data, orig_url, paper=None):
         href = a['href']
         if href.find('?')>0: href = href[ : href.find('?') ]
         if href.lower().endswith('.ris'):
-            log_info('importer', 'found RIS link: %s' % a)
+            log_debug('found RIS link: %s' % a)
             break
         for c in a.contents:
             c = str(c).lower()
             if c.find('refworks')!=-1 or c.find('procite')!=-1 or c.find('refman')!=-1 or c.find('endnote')!=-1:
-                log_info('importer', 'found RIS link: %s' % a)
+                log_debug('found RIS link: %s' % a)
                 #TODO: Do something with ris link
 
     # search for pdf link
@@ -386,12 +386,12 @@ def _import_unknown_citation(data, orig_url, paper=None):
         if href.find('?')>0: href = href[ : href.find('?') ]
         if href.lower().endswith('pdf'):
             pdf_link = a['href']
-            log_info('importer', 'found PDF link: %s' % a)
+            log_debug('found PDF link: %s' % a)
             break
         for c in a.contents:
             c = str(c).lower()
             if c.find('pdf')!=-1:
-                log_info('importer', 'found PDF link: %s' % a)
+                log_debug('found PDF link: %s' % a)
                 pdf_link = a['href']
                 break
 
@@ -408,7 +408,7 @@ def find_and_attach_pdf(paper, urls, visited_urls=set() ):
     for url in urls:
         if url.find('?')>0: url = url[ : url.find('?') ]
         if url.lower().endswith('pdf'):
-            log_info('importer', 'found PDF link: %s' % url)
+            log_debug('found PDF link: %s' % url)
             visited_urls.add(url)
             params = openanything.fetch(url)
             if params['status']==200 or params['status']==302 :
@@ -416,7 +416,7 @@ def find_and_attach_pdf(paper, urls, visited_urls=set() ):
                     # we have a live one!
                     try:
                         filename = params['url'][ params['url'].rfind('/')+1 : ]
-                        log_info('importer', 'importing paper: %s' % filename)
+                        log_info('importing paper: %s' % filename)
                         paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf', params['data'] )
                         paper.save()
                         return True
@@ -431,7 +431,7 @@ def find_and_attach_pdf(paper, urls, visited_urls=set() ):
                 # we have a live one!
                 try:
                     filename = params['url'][ params['url'].rfind('/')+1 : ]
-                    log_info('importer', 'importing paper: %s' % filename)
+                    log_info('importing paper: %s' % filename)
                     paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf', params['data'] )
                     paper.save()
                     return True
@@ -454,14 +454,14 @@ def find_and_attach_pdf(paper, urls, visited_urls=set() ):
                     if x.find('?')>0: x = x[ : x.find('?') ]
                     if x.lower().endswith('pdf'):
                         if href not in visited_urls:
-                            log_info('importer', 'found PDF link: %s' % a)
+                            log_info('found PDF link: %s' % a)
                             promising_links.add( href )
                             continue
                     for c in a.contents:
                         c = str(c).lower()
                         if c.find('pdf')!=-1:
                             if href not in visited_urls:
-                                log_info('importer', 'found PDF link: %s' % a)
+                                log_info('found PDF link: %s' % a)
                                 promising_links.add( href )
                                 continue
                 if promising_links: print promising_links

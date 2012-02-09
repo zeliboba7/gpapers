@@ -9,23 +9,21 @@ __all__ = ['log_error', 'log_warn', 'log_info', 'log_debug', 'log_level_error',
            'log_level_warn', 'log_level_info', 'log_level_debug' ]
 
 console = logging.StreamHandler(sys.stderr)
-formatter = logging.Formatter('%(name)-18s: %(levelname)-8s %(message)s')
+formatter = logging.Formatter('%(asctime)s: %(name)-18s: %(levelname)-8s %(message)s')
 console.setFormatter(formatter)
 logging.getLogger('gPapers').addHandler(console)
 
-get_log = logging.getLogger
+def log_error(message):
+    logging.getLogger('gPapers').error(message)
 
-def log_error(logname, message):
-    get_log(logname).error(message)
+def log_warn(message):
+    logging.getLogger('gPapers').warn(message)
 
-def log_warn(logname, message):
-    get_log(logname).warn(message)
+def log_info(message):
+    logging.getLogger('gPapers').info(message)
 
-def log_info(logname, message):
-    get_log(logname).info(message)
-
-def log_debug(logname, message):
-    get_log(logname).debug(message)
+def log_debug(message):
+    logging.getLogger('gPapers').debug(message)
 
 def log_level_error():
     '''Shows log messages only of level ERROR or higher.

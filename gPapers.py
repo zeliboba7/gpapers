@@ -57,7 +57,7 @@ try:
     gtk.gdk.threads_init()
 except:
     traceback.print_exc()
-    log_error('gPapers.py', 'Could not import required GTK libraries.')
+    log_error('Could not import required GTK libraries.')
     sys.exit()
 
 LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION = ('add_to_playlist', gtk.TARGET_SAME_APP, 0)
@@ -162,26 +162,26 @@ def sort_model_by_column(column, model, model_column_number):
     column.set_sort_order(sort_order)        
      
 def fetch_citation_via_url(url):
-    log_info('gPapers.py', 'trying to fetch: %s' % url)
+    log_info('trying to fetch: %s' % url)
     t = thread.start_new_thread( importer.import_citation, (url, None, main_gui.refresh_middle_pane_search ) )
 
 def fetch_citation_via_middle_top_pane_row(row):
     t = thread.start_new_thread( import_citation_via_middle_top_pane_row, (row,) )
     
 def fetch_citations_via_urls(urls):
-    log_info('gPapers.py', 'trying to fetch: %s' % str(urls))
+    log_info('trying to fetch: %s' % str(urls))
     t = thread.start_new_thread( import_citations, (urls,) )
     
 def fetch_citations_via_references(references):
-    log_info('gPapers.py', 'trying to fetch: %s' % str(references))
+    log_info('trying to fetch: %s' % str(references))
     t = thread.start_new_thread( import_citations_via_references, (references,) )
 
 def fetch_citations_via_bibtexs(bibtexs):
-    log_info('gPapers.py', 'trying to fetch bibtexs: %s' % str(bibtexs))
+    log_info('trying to fetch bibtexs: %s' % str(bibtexs))
     t = thread.start_new_thread( import_citations_via_bibtexs, (bibtexs,) )
 
 def fetch_documents_via_filenames(filenames):
-    log_info('gPapers.py', 'trying to fetch files: %s' % str(filenames))
+    log_info('trying to fetch files: %s' % str(filenames))
     t = thread.start_new_thread( import_documents_via_filenames, (filenames,) )
     
 def import_citations(urls):
@@ -259,9 +259,9 @@ def import_document( filename, data=None ):
         params = openanything.fetch(filename)
         data = params['data']
         if not data:
-            log_error('gPapers.py', 'Could not get: %s' % filename)
+            log_error('Could not get: %s' % filename)
     try:
-        log_info('gPapers.py', 'Importing paper: %s' % filename)
+        log_info('Importing paper: %s' % filename)
         md5_hexdigest = get_md5_hexdigest_from_data( data )
         paper, created = importer.get_or_create_paper_via( full_text_md5=md5_hexdigest )
         if created:
@@ -271,9 +271,9 @@ def import_document( filename, data=None ):
             if not data:
                 paper.import_url = params['url']
             paper.save()
-            log_info('gPapers.py', 'Imported paper: %s' % filename)
+            log_info('Imported paper: %s' % filename)
         else:
-            log_info('gPapers.py', 'Paper for file %s already exists (%s, "%s")' % (filename, str(paper.get_authors_in_order()), paper.title))
+            log_info('Paper for file %s already exists (%s, "%s")' % (filename, str(paper.get_authors_in_order()), paper.title))
             
     except:
         traceback.print_exc()
@@ -894,7 +894,6 @@ class MainGUI:
             self.ui.get_widget('my_library_filter_pane').hide()
 
         if rows[0][0]==1:
-            log_debug('gPapers.py', 'initiating pubmed search')
             self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread( self.refresh_middle_pane_from_pubmed, () )
        
         self.select_middle_top_pane_item( self.ui.get_widget('middle_top_pane').get_selection() )
@@ -1271,7 +1270,7 @@ class MainGUI:
                     playlist.papers.add(paper)
                 thread.start_new_thread( self.refresh_middle_pane_from_my_library, (False,) )
             if not self.current_playlist:
-                log_info('gPapers.py', 'can only reorder playlists')
+                log_info('can only reorder playlists')
         except:
             traceback.print_exc()
         
@@ -1451,7 +1450,7 @@ class MainGUI:
             for row in rows:
                 if liststore[row][0]!=-1:
                     selected_valid_paper_ids.append( liststore[row][0] )
-            log_debug('gPapers.py', 'selected_valid_paper_ids: %s' % str(selected_valid_paper_ids))
+            log_debug('selected_valid_paper_ids: %s' % str(selected_valid_paper_ids))
             if len(selected_valid_paper_ids):
                 button = gtk.ToolButton(gtk.STOCK_REMOVE)
                 button.set_tooltip(gtk.Tooltips(), 'Remove these papers from your library...')
@@ -1477,7 +1476,7 @@ class MainGUI:
         paper_information_toolbar.show_all()
         
     def graph_papers_and_authors(self, paper_ids=None):
-        log_debug('gPapers.py', 'paper_ids: %s', str(paper_ids))
+        log_debug('paper_ids: %s', str(paper_ids))
         g = []
         g.append('graph G {')
         g.append('\toverlap=false;')
@@ -1642,7 +1641,7 @@ class MainGUI:
         dialog.destroy()
         if response == gtk.RESPONSE_YES:
             for paper in papers:
-                log_info('gPapers.py: ', 'deleting paper: %s', str(paper))
+                log_info('deleting paper: %s', str(paper))
                 paper.delete()
             self.refresh_middle_pane_search()
             
@@ -2539,7 +2538,7 @@ if __name__ == "__main__":
     
     MEDIA_ROOT = settings.MEDIA_ROOT
 
-    log_info('gPapers.py', 'gpapers: using database at %s' % MEDIA_ROOT)
+    log_info('using database at %s' % MEDIA_ROOT)
     
     if not os.path.isdir( MEDIA_ROOT ):
         os.mkdir( MEDIA_ROOT )

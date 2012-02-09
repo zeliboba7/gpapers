@@ -13,18 +13,15 @@ def search(search_text):
     Returns a list of dictionaries: The PUBMED results for the given search
     query
     '''    
-
-    log_debug('pubmed', 'search("%s")' % search_text)
-
     if not search_text:
         return [] # Do not make empty queries
 
     # First do a query only for ids that is saved on the server
-    log_debug('pubmed', 'Starting Pubmed query')
+    log_debug('Starting Pubmed query for string "%s"' % search_text)
     query = BASE_URL + ESEARCH_QUERY % urllib.quote_plus(search_text)
     response = urllib.urlopen(query)
     if not (response.getcode() == 200 or response.getcode() == 302):
-        log_error('pubmed', 'Pubmed replied with error code %d for query: %s' % \
+        log_error('Pubmed replied with error code %d for query: %s' % \
                   (response.getcode(), query))
         #TODO: Show a dialog or handle it differently?
         return []
@@ -33,7 +30,7 @@ def search(search_text):
     
     # Check wether there were any hits at all
     if int(parsed_response.esearchresult.count.string) == 0:
-        log_info('pubmed', 'No hits for search string "%s"' % search_text)
+        log_info('No hits for search string "%s"' % search_text)
         return []
     
     web_env = parsed_response.esearchresult.webenv.string
@@ -41,11 +38,11 @@ def search(search_text):
     response.close()
     
     # Download the summaries    
-    log_debug('pubmed', 'Continuing Pubmed query (downloading summaries)')        
+    log_debug('Continuing Pubmed query (downloading summaries)')        
     query = BASE_URL + ESUMMARY_QUERY % (query_key, web_env)
     response = urllib.urlopen(query)
     if not (response.getcode() == 200 or response.getcode() == 302):  
-        log_error('pubmed', 'Pubmed replied with error code %d for query: %s' % \
+        log_error('Pubmed replied with error code %d for query: %s' % \
           (response.getcode(), query))              
     parsed_response = BeautifulSoup.BeautifulStoneSoup(response)
 
