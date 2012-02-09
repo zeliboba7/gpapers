@@ -2,6 +2,8 @@ import urllib
 
 import BeautifulSoup
 
+from utils import log_debug, log_info, log_error
+
 BASE_URL = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
 ESEARCH_QUERY = 'esearch.fcgi?db=pubmed&term=%s&usehistory=y'
 ESUMMARY_QUERY = 'esummary.fcgi?db=pubmed&query_key=%s&WebEnv=%s'
@@ -10,15 +12,18 @@ def search(search_text):
     '''
     Returns a list of dictionaries: The PUBMED results for the given search
     query
-    '''
+    '''    
 
     if not search_text:
         return [] # Do not make empty queries
 
     # First do a query only for ids that is saved on the server
+    log_debug('pubmed', 'Starting Pubmed query')
     query = BASE_URL + ESEARCH_QUERY % urllib.quote_plus(search_text)
     response = urllib.urlopen(query)
     if not (response.getcode() == 200 or response.getcode() == 302):
+        log_error('pubmed', 'Pubmed replied with error code %d for query: %s' % \
+                  (response.getcode(), query))
         #TODO: Show a dialog or handle it differently?
         return []
                     
@@ -26,17 +31,20 @@ def search(search_text):
     
     # Check wether there were any hits at all
     if int(parsed_response.esearchresult.count.string) == 0:
+        log_info('pubmed', 'No hits for search string "%s"' % search_text)
         return []
     
     web_env = parsed_response.esearchresult.webenv.string
     query_key = parsed_response.esearchresult.querykey.string
     response.close()
     
-    # Download the summaries
+    # Download the summaries    
+    log_debug('pubmed', 'Continuing Pubmed query (downloading summaries)')        
     query = BASE_URL + ESUMMARY_QUERY % (query_key, web_env)
     response = urllib.urlopen(query)
-    if not (response.getcode() == 200 or response.getcode() == 302):        
-        return []           
+    if not (response.getcode() == 200 or response.getcode() == 302):  
+        log_error('pubmed', 'Pubmed replied with error code %d for query: %s' % \
+          (response.getcode(), query))              
     parsed_response = BeautifulSoup.BeautifulStoneSoup(response)
 
     # get information for all documents
