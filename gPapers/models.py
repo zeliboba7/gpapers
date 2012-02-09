@@ -210,7 +210,7 @@ class Paper(models.Model):
                                 author.save()
                             self.authors.add(author)
                 except:
-                    pass
+                    traceback.print_exc()
             # also has: doc_info['/Author'], doc_info['/ModDate'], doc_info['/CreationDate']
 
             # extract the actual text

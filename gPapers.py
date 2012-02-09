@@ -28,7 +28,7 @@ import sqlite3
 import cairo
 import poppler
 
-from utils import *
+from logger import *
 log_level_debug()
 
 RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
@@ -894,6 +894,7 @@ class MainGUI:
             self.ui.get_widget('my_library_filter_pane').hide()
 
         if rows[0][0]==1:
+            log_debug('gPapers.py', 'initiating pubmed search')
             self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread( self.refresh_middle_pane_from_pubmed, () )
        
         self.select_middle_top_pane_item( self.ui.get_widget('middle_top_pane').get_selection() )
