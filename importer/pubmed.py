@@ -2,7 +2,7 @@ import urllib
 
 import BeautifulSoup
 
-from utils import log_debug, log_info, log_error
+from logger import log_debug, log_info, log_error
 
 BASE_URL = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
 ESEARCH_QUERY = 'esearch.fcgi?db=pubmed&term=%s&usehistory=y'
@@ -13,6 +13,8 @@ def search(search_text):
     Returns a list of dictionaries: The PUBMED results for the given search
     query
     '''    
+
+    log_debug('pubmed', 'search("%s")' % search_text)
 
     if not search_text:
         return [] # Do not make empty queries

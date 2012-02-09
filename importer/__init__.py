@@ -36,7 +36,7 @@ from gPapers.models import *
 from django.template import defaultfilters
 import BeautifulSoup, openanything
 
-from utils import *
+from logger import *
 
 active_threads = None
 
