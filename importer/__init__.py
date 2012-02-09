@@ -239,6 +239,7 @@ def update_paper_from_bibtex_html( paper, html ):
 
     return paper
 
+#TODO: Refactor import_pdf into a new function 
 
 def import_citation(url, paper=None, callback=None):
     active_threads[ thread.get_ident() ] = 'importing: '+ url
@@ -253,12 +254,11 @@ def import_citation(url, paper=None, callback=None):
 #            gtk.gdk.threads_leave()
             return
 
+        data = response.read(-1)
         info = response.info()
 
         if info.gettype() == 'application/pdf' or info.gettype() == 'application/octet-stream':
-            # this is hopefully a PDF file
-            response = urllib.urlopen(url)
-            data = response.read(-1)            
+            # this is hopefully a PDF file                     
 
             #Try finding a PDF file name in the url
             parsed_url = urlparse.urlsplit(url)
@@ -300,7 +300,7 @@ def import_citation(url, paper=None, callback=None):
             return paper
 
         # let's see if there's a pdf somewhere in here...
-        paper = _import_unknown_citation(response, response.geturl(), paper=paper)
+        paper = _import_unknown_citation(data, response.geturl(), paper=paper)
         if paper and callback:callback()
         if paper: return paper
 
@@ -352,6 +352,8 @@ p_html_a_href = re.compile( '''href *= *['"]([^'^"]+)['"]''' , re.IGNORECASE)
 
 def _import_unknown_citation(data, orig_url, paper=None):
 
+    print 'orig_url: ', orig_url
+
     # soupify
     soup = BeautifulSoup.BeautifulSoup( data )
 
@@ -375,7 +377,7 @@ def _import_unknown_citation(data, orig_url, paper=None):
             c = str(c).lower()
             if c.find('refworks')!=-1 or c.find('procite')!=-1 or c.find('refman')!=-1 or c.find('endnote')!=-1:
                 print thread.get_ident(), 'found ris link:', a
-                #TODO: Do something with bibtex link
+                #TODO: Do something with ris link
 
     # search for pdf link
     # TODO: If more than one link is found, present the choice to the user
@@ -386,6 +388,8 @@ def _import_unknown_citation(data, orig_url, paper=None):
         if not a.has_key('href'):
             continue
         href = a['href']
+        if href.lower() ==  orig_url.lower(): #this is were we came from...
+            continue
         if href.find('?')>0: href = href[ : href.find('?') ]
         if href.lower().endswith('pdf'):
             pdf_link = a['href']
