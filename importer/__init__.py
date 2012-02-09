@@ -30,6 +30,8 @@ import gnome
 import gnome.ui
 import pango
 
+from pyPdf import PdfFileReader
+
 from gPapers.models import *
 from django.template import defaultfilters
 import BeautifulSoup, openanything
@@ -243,7 +245,7 @@ def import_citation(url, paper=None, callback=None):
     try:
         response = urllib.urlopen(url)
         if response.getcode()!=200 and response.getcode()!=302:
-            print thread.get_ident(), 'unable to download: %s  (%i)' % ( url, params['status'] )
+            print thread.get_ident(), 'unable to download: %s  (%i)' % ( url, response.getcode() )
 #            gtk.gdk.threads_enter()
 #            error = gtk.MessageDialog( type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL )
 #            error.set_markup('<b>Unable to Download Paper</b>\n\nThe following url:\n<i>%s</i>\n\nreturned the HTTP error code: %i' % ( url.replace('&', '&amp;'), params['status'] ))
@@ -252,29 +254,47 @@ def import_citation(url, paper=None, callback=None):
             return
 
         info = response.info()
-        print info.gettype()
 
-        if info.gettype() == 'application/pdf':
-            # this is a pdf file
-            filename = response.geturl()[response.geturl() + 1: ]
-            # strip params
-            if filename.find('?')>0: filename = filename[ : filename.find('?') ]
-            data = params['data']
+        if info.gettype() == 'application/pdf' or info.gettype() == 'application/octet-stream':
+            # this is hopefully a PDF file
+            response = urllib.urlopen(url)
+            data = response.read(-1)            
+
+            #Try finding a PDF file name in the url
+            parsed_url = urlparse.urlsplit(url)
+            filename = os.path.split(parsed_url.path)[1]
+            
+            if os.path.splitext(filename)[1].lower() != '.pdf':
+                filename = None
+                #That didn't work, try to find a filename in the query string
+                query = urlparse.parse_qs(parsed_url.query)
+                for key in query:
+                    if os.path.splitext(query[key])[1].lower() == '.pdf':
+                        filename = query[key].lower() # found a .pdf name
+                        break
+            
             print thread.get_ident(), 'importing paper =', filename
 
             if not paper:
-                md5_hexdigest = get_md5_hexdigest_from_data( data )
-                paper, created = get_or_create_paper_via( full_text_md5=md5_hexdigest )
+                md5_hexdigest = get_md5_hexdigest_from_data(data)
+                paper, created = get_or_create_paper_via(full_text_md5=md5_hexdigest)
                 if created:
-                    #paper.title = filename
-                    paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf', data )
+                    if not filename:
+                        filename = md5_hexdigest # last resort for filename
+                        
+                    paper.save_file(defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf',
+                                    data)
                     paper.import_url = response.geturl()
                     paper.save()
                     print thread.get_ident(), 'imported paper =', filename
                 else:
-                    print thread.get_ident(), 'paper already exists: paper =', paper.id, paper.doi, paper.title, paper.get_authors_in_order()
+                    print thread.get_ident(),\
+                            'paper already exists: paper =', paper.id, paper.doi,\
+                                                             paper.title,\
+                                                             paper.get_authors_in_order()
             else:
-                paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf', data )
+                paper.save_file( defaultfilters.slugify(filename.replace('.pdf',''))+'.pdf',
+                                 local_file.read())
                 paper.import_url = response.geturl()
                 paper.save()
             return paper
