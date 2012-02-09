@@ -2,8 +2,6 @@ import urllib
 
 import BeautifulSoup
 
-from gPapers.models import *
-
 BASE_URL = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
 ESEARCH_QUERY = 'esearch.fcgi?db=pubmed&term=%s&usehistory=y'
 ESUMMARY_QUERY = 'esummary.fcgi?db=pubmed&query_key=%s&WebEnv=%s'
@@ -50,7 +48,6 @@ def search(search_text):
         info['pubmed_id'] = str(document.id.string)        
 
         doi = document.findAll('item', {'name' : 'doi'})
-        import_url = ''
         if doi:
             info['doi'] = doi[0].string
             info['import_url'] = 'http://dx.doi.org/' + info['doi']
@@ -66,7 +63,6 @@ def search(search_text):
             info['year'] = pubdate[0].string[:4]
         
         #TODO: Retrieve abstract
-        abstract = ''
             
         papers.append(info)
 
