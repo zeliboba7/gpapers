@@ -49,7 +49,6 @@ try:
     pygtk.require("2.0")
     import gobject
     import gtk
-    import gtk.glade
     import gnome
     import gnome.ui
     import pango
@@ -396,8 +395,9 @@ class MainGUI:
     
     def __init__(self):
         gnome.init(PROGRAM, VERSION)
-        self.ui = gtk.glade.XML(RUN_FROM_DIR + 'ui.glade')
-        main_window = self.ui.get_widget('main_window')
+        self.ui = gtk.Builder()
+        self.ui.add_from_file(RUN_FROM_DIR + 'ui.xml')
+        main_window = self.ui.get_object('main_window')
         main_window.connect("delete-event", lambda x,y: sys.exit(0) )
         self.init_menu()
         self.init_search_box()
@@ -412,11 +412,11 @@ class MainGUI:
         main_window.show()
         
     def init_busy_notifier(self):
-        busy_notifier = self.ui.get_widget('busy_notifier')
+        busy_notifier = self.ui.get_object('busy_notifier')
         busy_notifier.set_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'blank.gif' ) )
         self.busy_notifier_is_running = False
         
-        treeview_running_tasks = self.ui.get_widget('treeview_running_tasks')
+        treeview_running_tasks = self.ui.get_object('treeview_running_tasks')
         # thread_id, text
         self.treeview_running_tasks_model = gtk.ListStore( int, str )
         treeview_running_tasks.set_model( self.treeview_running_tasks_model )
@@ -438,37 +438,37 @@ class MainGUI:
                     for x in self.active_threads.items():
                         self.treeview_running_tasks_model.append( x )
                     if not self.busy_notifier_is_running:
-                        self.ui.get_widget('busy_notifier').set_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'process-working.gif' ) )
+                        self.ui.get_object('busy_notifier').set_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'process-working.gif' ) )
                         self.busy_notifier_is_running = True
-                        self.ui.get_widget('treeview_running_tasks').show()
+                        self.ui.get_object('treeview_running_tasks').show()
                 else:
                     if self.busy_notifier_is_running:
-                        self.ui.get_widget('busy_notifier').set_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'blank.gif' ) )
+                        self.ui.get_object('busy_notifier').set_from_file( os.path.join( RUN_FROM_DIR, 'icons', 'blank.gif' ) )
                         self.busy_notifier_is_running = False
-                        self.ui.get_widget('treeview_running_tasks').hide()
+                        self.ui.get_object('treeview_running_tasks').hide()
             except:
                 traceback.print_exc()
             time.sleep(1)
         
 
     def init_menu(self):
-        self.ui.get_widget('menuitem_quit').connect('activate', lambda x: sys.exit(0))
-        self.ui.get_widget('menuitem_import_url').connect('activate', self.import_url)
-        self.ui.get_widget('menuitem_import_doi').connect('activate', self.import_doi)
-        self.ui.get_widget('menuitem_import_file').connect('activate', self.import_file)
-        self.ui.get_widget('menuitem_import_directory').connect('activate', self.import_directory)
-        self.ui.get_widget('menuitem_preferences').connect('activate', lambda x: PreferencesGUI())
-        self.ui.get_widget('menuitem_import_bibtex').connect('activate', self.import_bibtex)
-        self.ui.get_widget('menuitem_author_graph').connect('activate', lambda x: self.graph_authors() )
-        self.ui.get_widget('menuitem_paper_graph').connect('activate', lambda x: self.graph_papers() )
-        self.ui.get_widget('menuitem_about').connect('activate', self.show_about_dialog )
-        self.ui.get_widget('menuitem_check_updates').connect('activate', lambda x: self.check_for_updates() )
+        self.ui.get_object('menuitem_quit').connect('activate', lambda x: sys.exit(0))
+        self.ui.get_object('menuitem_import_url').connect('activate', self.import_url)
+        self.ui.get_object('menuitem_import_doi').connect('activate', self.import_doi)
+        self.ui.get_object('menuitem_import_file').connect('activate', self.import_file)
+        self.ui.get_object('menuitem_import_directory').connect('activate', self.import_directory)
+        self.ui.get_object('menuitem_preferences').connect('activate', lambda x: PreferencesGUI())
+        self.ui.get_object('menuitem_import_bibtex').connect('activate', self.import_bibtex)
+        self.ui.get_object('menuitem_author_graph').connect('activate', lambda x: self.graph_authors() )
+        self.ui.get_object('menuitem_paper_graph').connect('activate', lambda x: self.graph_papers() )
+        self.ui.get_object('menuitem_about').connect('activate', self.show_about_dialog )
+        self.ui.get_object('menuitem_check_updates').connect('activate', lambda x: self.check_for_updates() )
         
     def init_search_box(self):
         thread.start_new_thread( self.watch_middle_pane_search, () )
-        self.ui.get_widget('refresh_middle_pane_search').connect( 'clicked', lambda x: self.refresh_middle_pane_search() )
-        self.ui.get_widget('clear_middle_pane_search').connect( 'clicked', lambda x: self.clear_all_search_and_filters() )
-        self.ui.get_widget('save_smart_search').connect( 'clicked', lambda x: self.save_smart_search() )
+        self.ui.get_object('refresh_middle_pane_search').connect( 'clicked', lambda x: self.refresh_middle_pane_search() )
+        self.ui.get_object('clear_middle_pane_search').connect( 'clicked', lambda x: self.clear_all_search_and_filters() )
+        self.ui.get_object('save_smart_search').connect( 'clicked', lambda x: self.save_smart_search() )
         
     def show_about_dialog(self, o):
         about = gtk.AboutDialog()
@@ -501,16 +501,16 @@ class MainGUI:
         t.start()
 
     def clear_all_search_and_filters(self):
-        self.ui.get_widget('middle_pane_search').set_text('')
-        self.ui.get_widget('author_filter').get_selection().unselect_all()
-        self.ui.get_widget('source_filter').get_selection().unselect_all()
-        self.ui.get_widget('organization_filter').get_selection().unselect_all()
+        self.ui.get_object('middle_pane_search').set_text('')
+        self.ui.get_object('author_filter').get_selection().unselect_all()
+        self.ui.get_object('source_filter').get_selection().unselect_all()
+        self.ui.get_object('organization_filter').get_selection().unselect_all()
         
     def save_smart_search(self):
-        liststore, rows = self.ui.get_widget('left_pane').get_selection().get_selected_rows()
+        liststore, rows = self.ui.get_object('left_pane').get_selection().get_selected_rows()
         playlist, created = Playlist.objects.get_or_create(
-            title = 'search: <i>%s</i>' % self.ui.get_widget('middle_pane_search').get_text(),
-            search_text = self.ui.get_widget('middle_pane_search').get_text(),
+            title = 'search: <i>%s</i>' % self.ui.get_object('middle_pane_search').get_text(),
+            search_text = self.ui.get_object('middle_pane_search').get_text(),
             parent = str(rows[0][0])
         )
         if created: playlist.save()
@@ -534,9 +534,9 @@ class MainGUI:
     def watch_middle_pane_search(self):
         self.last_middle_pane_search_string = ''
         while True:
-            if self.last_middle_pane_search_string==None or self.ui.get_widget('middle_pane_search').get_text()!=self.last_middle_pane_search_string:
-                self.last_middle_pane_search_string = self.ui.get_widget('middle_pane_search').get_text()
-                selection = self.ui.get_widget('left_pane').get_selection()
+            if self.last_middle_pane_search_string==None or self.ui.get_object('middle_pane_search').get_text()!=self.last_middle_pane_search_string:
+                self.last_middle_pane_search_string = self.ui.get_object('middle_pane_search').get_text()
+                selection = self.ui.get_object('left_pane').get_selection()
                 liststore, rows = selection.get_selected_rows()
                 selection.unselect_all()
                 if rows:
@@ -546,7 +546,7 @@ class MainGUI:
             time.sleep(1)
         
     def init_left_pane(self):
-        left_pane = self.ui.get_widget('left_pane')
+        left_pane = self.ui.get_object('left_pane')
         # name, icon, playlist_id, editable
         self.left_pane_model = gtk.TreeStore( str, gtk.gdk.Pixbuf, int, bool )
         left_pane.set_model( self.left_pane_model )
@@ -570,7 +570,7 @@ class MainGUI:
         left_pane.connect("drag-motion", self.handle_left_pane_drag_motion_event)
         
     def init_pdf_preview_pane(self):
-        pdf_preview = self.ui.get_widget('pdf_preview')
+        pdf_preview = self.ui.get_object('pdf_preview')
         self.pdf_preview = {}
         self.pdf_preview['scale'] = None
         pdf_preview.connect("expose-event", self.on_expose_pdf_preview)
@@ -582,15 +582,15 @@ class MainGUI:
         pdf_preview.drag_dest_set( gtk.DEST_DEFAULT_ALL, [PDF_PREVIEW_MOVE_NOTE_DND_ACTION], gtk.gdk.ACTION_MOVE )
         pdf_preview.connect('drag-drop', self.handle_pdf_preview_drag_drop_event)
         
-        self.ui.get_widget('button_move_previous_page').connect('clicked', lambda x: self.goto_pdf_page( self.pdf_preview['current_page_number']-1 ) )
-        self.ui.get_widget('button_move_next_page').connect('clicked', lambda x: self.goto_pdf_page( self.pdf_preview['current_page_number']+1 ) )
-        self.ui.get_widget('button_zoom_in').connect('clicked', lambda x: self.zoom_pdf_page( -1.2 ) )
-        self.ui.get_widget('button_zoom_out').connect('clicked', lambda x: self.zoom_pdf_page( -.8 ) )
-        self.ui.get_widget('button_zoom_normal').connect('clicked', lambda x: self.zoom_pdf_page( 1 ) )
-        self.ui.get_widget('button_zoom_best_fit').connect('clicked', lambda x: self.zoom_pdf_page( None ) )
+        self.ui.get_object('button_move_previous_page').connect('clicked', lambda x: self.goto_pdf_page( self.pdf_preview['current_page_number']-1 ) )
+        self.ui.get_object('button_move_next_page').connect('clicked', lambda x: self.goto_pdf_page( self.pdf_preview['current_page_number']+1 ) )
+        self.ui.get_object('button_zoom_in').connect('clicked', lambda x: self.zoom_pdf_page( -1.2 ) )
+        self.ui.get_object('button_zoom_out').connect('clicked', lambda x: self.zoom_pdf_page( -.8 ) )
+        self.ui.get_object('button_zoom_normal').connect('clicked', lambda x: self.zoom_pdf_page( 1 ) )
+        self.ui.get_object('button_zoom_best_fit').connect('clicked', lambda x: self.zoom_pdf_page( None ) )
 
     def refresh_pdf_preview_pane(self):
-        pdf_preview = self.ui.get_widget('pdf_preview')
+        pdf_preview = self.ui.get_object('pdf_preview')
         if self.displayed_paper and self.displayed_paper.full_text and os.path.isfile( self.displayed_paper.full_text.path ):
             self.pdf_preview['document'] = poppler.document_new_from_file ('file://'+ self.displayed_paper.full_text.path, None)
             self.pdf_preview['n_pages'] = self.pdf_preview['document'].get_n_pages()
@@ -599,12 +599,12 @@ class MainGUI:
         else:
             pdf_preview.set_size_request(0,0)
             self.pdf_preview['current_page'] = None
-            self.ui.get_widget('button_move_previous_page').set_sensitive( False )
-            self.ui.get_widget('button_move_next_page').set_sensitive( False )
-            self.ui.get_widget('button_zoom_out').set_sensitive( False )
-            self.ui.get_widget('button_zoom_in').set_sensitive( False )
-            self.ui.get_widget('button_zoom_normal').set_sensitive( False )
-            self.ui.get_widget('button_zoom_best_fit').set_sensitive( False )
+            self.ui.get_object('button_move_previous_page').set_sensitive( False )
+            self.ui.get_object('button_move_next_page').set_sensitive( False )
+            self.ui.get_object('button_zoom_out').set_sensitive( False )
+            self.ui.get_object('button_zoom_in').set_sensitive( False )
+            self.ui.get_object('button_zoom_normal').set_sensitive( False )
+            self.ui.get_object('button_zoom_best_fit').set_sensitive( False )
         pdf_preview.queue_draw()
         
     def goto_pdf_page(self, page_number, new_doc=False):
@@ -612,28 +612,28 @@ class MainGUI:
             if not new_doc and self.pdf_preview.get('current_page') and self.pdf_preview['current_page_number']==page_number:
                 return
             if page_number<0: page_number = 0
-            pdf_preview = self.ui.get_widget('pdf_preview')
+            pdf_preview = self.ui.get_object('pdf_preview')
             self.pdf_preview['current_page_number'] = page_number
             self.pdf_preview['current_page'] = self.pdf_preview['document'].get_page( self.pdf_preview['current_page_number'] )
             if self.pdf_preview['current_page']:
                 self.pdf_preview['width'], self.pdf_preview['height'] = self.pdf_preview['current_page'].get_size()
-                self.ui.get_widget('button_move_previous_page').set_sensitive( page_number>0 )
-                self.ui.get_widget('button_move_next_page').set_sensitive( page_number<self.pdf_preview['n_pages']-1 )
+                self.ui.get_object('button_move_previous_page').set_sensitive( page_number>0 )
+                self.ui.get_object('button_move_next_page').set_sensitive( page_number<self.pdf_preview['n_pages']-1 )
                 self.zoom_pdf_page( self.pdf_preview['scale'], redraw=False )
             else:
-                self.ui.get_widget('button_move_previous_page').set_sensitive( False )
-                self.ui.get_widget('button_move_next_page').set_sensitive( False )
+                self.ui.get_object('button_move_previous_page').set_sensitive( False )
+                self.ui.get_object('button_move_next_page').set_sensitive( False )
             pdf_preview.queue_draw()
         else:
-            self.ui.get_widget('button_move_previous_page').set_sensitive( False )
-            self.ui.get_widget('button_move_next_page').set_sensitive( False )
+            self.ui.get_object('button_move_previous_page').set_sensitive( False )
+            self.ui.get_object('button_move_next_page').set_sensitive( False )
 
     def zoom_pdf_page(self, scale, redraw=True):
         """None==auto-size, negative means relative, positive means fixed"""
         if self.displayed_paper:
             if redraw and self.pdf_preview.get('current_page') and self.pdf_preview['scale']==scale:
                 return
-            pdf_preview = self.ui.get_widget('pdf_preview')
+            pdf_preview = self.ui.get_object('pdf_preview')
             auto_scale = (pdf_preview.get_parent().get_allocation().width-2.0) / self.pdf_preview['width']
             if scale==None:
                 scale = auto_scale
@@ -644,10 +644,10 @@ class MainGUI:
                 else:
                     self.pdf_preview['scale'] = scale
             pdf_preview.set_size_request(int(self.pdf_preview['width']*scale), int(self.pdf_preview['height']*scale))
-            self.ui.get_widget('button_zoom_out').set_sensitive( scale>0.3 )
-            self.ui.get_widget('button_zoom_in').set_sensitive( True )
-            self.ui.get_widget('button_zoom_normal').set_sensitive( True )
-            self.ui.get_widget('button_zoom_best_fit').set_sensitive( True )
+            self.ui.get_object('button_zoom_out').set_sensitive( scale>0.3 )
+            self.ui.get_object('button_zoom_in').set_sensitive( True )
+            self.ui.get_object('button_zoom_normal').set_sensitive( True )
+            self.ui.get_object('button_zoom_best_fit').set_sensitive( True )
             if redraw: pdf_preview.queue_draw()
             return scale
         else:
@@ -659,7 +659,7 @@ class MainGUI:
         cr.set_source_rgb(1, 1, 1)
         scale = self.pdf_preview['scale']
         if scale==None:
-            scale = (self.ui.get_widget('pdf_preview').get_parent().get_allocation().width-2.0) / self.pdf_preview['width']
+            scale = (self.ui.get_object('pdf_preview').get_parent().get_allocation().width-2.0) / self.pdf_preview['width']
         if scale != 1:
             cr.scale(scale, scale)
         cr.rectangle(0, 0, self.pdf_preview['width'], self.pdf_preview['height'])
@@ -677,7 +677,7 @@ class MainGUI:
         
     def init_my_library_filter_pane(self):
         
-        author_filter = self.ui.get_widget('author_filter')
+        author_filter = self.ui.get_object('author_filter')
         # id, author, paper_count
         self.author_filter_model = gtk.ListStore( int, str, int )
         author_filter.set_model( self.author_filter_model )
@@ -695,7 +695,7 @@ class MainGUI:
         author_filter.connect('row-activated', self.handle_author_filter_row_activated )
         author_filter.connect('button-press-event', self.handle_author_filter_button_press_event)
 
-        organization_filter = self.ui.get_widget('organization_filter')
+        organization_filter = self.ui.get_object('organization_filter')
         # id, org, author_count, paper_count
         self.organization_filter_model = gtk.ListStore( int, str, int, int )
         organization_filter.set_model( self.organization_filter_model )
@@ -716,7 +716,7 @@ class MainGUI:
         organization_filter.connect('row-activated', self.handle_organization_filter_row_activated )
         organization_filter.connect('button-press-event', self.handle_organization_filter_button_press_event)
 
-        source_filter = self.ui.get_widget('source_filter')
+        source_filter = self.ui.get_object('source_filter')
         # id, name, issue, location, publisher, date
         self.source_filter_model = gtk.ListStore( int, str, str, str, str, str )
         source_filter.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
@@ -756,7 +756,7 @@ class MainGUI:
 
 
     def init_bookmark_pane(self):
-        treeview_bookmarks = self.ui.get_widget('treeview_bookmarks')
+        treeview_bookmarks = self.ui.get_object('treeview_bookmarks')
         # id, page, title, updated, words
         self.treeview_bookmarks_model = gtk.ListStore( int, int, str, str, int )
         treeview_bookmarks.set_model( self.treeview_bookmarks_model )
@@ -785,10 +785,10 @@ class MainGUI:
         bookmark.save()
         
     def init_paper_information_pane(self):
-        paper_notes = self.ui.get_widget('paper_notes')
+        paper_notes = self.ui.get_object('paper_notes')
         paper_notes.modify_base( gtk.STATE_NORMAL, gtk.gdk.color_parse("#fff7e8") )
         paper_notes.modify_base( gtk.STATE_INSENSITIVE, gtk.gdk.color_parse("#ffffff") )
-        pane = self.ui.get_widget('paper_information_pane')
+        pane = self.ui.get_object('paper_information_pane')
         # text
         self.paper_information_pane_model = gtk.ListStore( str, str )
         pane.set_model( self.paper_information_pane_model )
@@ -814,7 +814,7 @@ class MainGUI:
         treeview.get_column(1).get_cell_renderers()[0].set_property('wrap-width', width)
 
     def refresh_left_pane(self):
-        left_pane = self.ui.get_widget('left_pane')
+        left_pane = self.ui.get_object('left_pane')
         self.left_pane_model.clear()
         self.left_pane_model.append( None, ( '<b>My Library</b>', left_pane.render_icon(gtk.STOCK_HOME, gtk.ICON_SIZE_MENU), -1, False ) )
         for playlist in Playlist.objects.filter(parent='0'):
@@ -837,16 +837,16 @@ class MainGUI:
             self.left_pane_model.append( self.left_pane_model.get_iter((3),), ( playlist.title, icon, playlist.id, True ) )
 
         left_pane.expand_all()
-        self.ui.get_widget('left_pane').get_selection().select_path((0,))
+        self.ui.get_object('left_pane').get_selection().select_path((0,))
 
     def select_left_pane_item(self, selection):
         liststore, rows = selection.get_selected_rows()
-        left_pane_toolbar = self.ui.get_widget('left_pane_toolbar')
+        left_pane_toolbar = self.ui.get_object('left_pane_toolbar')
         left_pane_toolbar.foreach( left_pane_toolbar.remove )
         if not rows:
-            self.ui.get_widget('middle_pane_label').set_markup('<i>nothing selected</i>')
+            self.ui.get_object('middle_pane_label').set_markup('<i>nothing selected</i>')
             return
-        self.ui.get_widget('middle_pane_label').set_markup( liststore[rows[0]][0] )
+        self.ui.get_object('middle_pane_label').set_markup( liststore[rows[0]][0] )
         self.middle_top_pane_model.clear()
 
         button = gtk.ToolButton(gtk.STOCK_ADD)
@@ -878,28 +878,28 @@ class MainGUI:
         if self.current_playlist:
             if self.current_playlist.search_text:
                 self.last_middle_pane_search_string = self.current_playlist.search_text
-                self.ui.get_widget('middle_pane_search').set_text( self.current_playlist.search_text )
+                self.ui.get_object('middle_pane_search').set_text( self.current_playlist.search_text )
             else:
                 self.last_middle_pane_search_string = ''
-                self.ui.get_widget('middle_pane_search').set_text('')
+                self.ui.get_object('middle_pane_search').set_text('')
 #            if len(self.current_playlist.papers.count()):
         
         if self.current_papers!=None:
             self.last_middle_pane_search_string = ''
-            self.ui.get_widget('middle_pane_search').set_text('')
+            self.ui.get_object('middle_pane_search').set_text('')
                 
         if rows[0][0]==0:
             self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread( self.refresh_middle_pane_from_my_library, (True,) )
         else:
-            self.ui.get_widget('my_library_filter_pane').hide()
+            self.ui.get_object('my_library_filter_pane').hide()
 
         if rows[0][0]==1:
             self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread( self.refresh_middle_pane_from_pubmed, () )
        
-        self.select_middle_top_pane_item( self.ui.get_widget('middle_top_pane').get_selection() )
+        self.select_middle_top_pane_item( self.ui.get_object('middle_top_pane').get_selection() )
 
     def init_middle_top_pane(self):
-        middle_top_pane = self.ui.get_widget('middle_top_pane')
+        middle_top_pane = self.ui.get_object('middle_top_pane')
         # id, authors, title, journal, year, rating, abstract, icon, import_url, doi, created, updated, empty_str, pubmed_id
         self.middle_top_pane_model = gtk.ListStore( int, str, str, str, str, int, str, gtk.gdk.Pixbuf, str, str, str, str, str, str )
         middle_top_pane.set_model( self.middle_top_pane_model )
@@ -1070,7 +1070,7 @@ class MainGUI:
     
     def handle_pdf_preview_drag_drop_event(self, o1, o2, x, y, o3):
         if self.current_bookmark:
-            pdf_preview = self.ui.get_widget('pdf_preview')
+            pdf_preview = self.ui.get_object('pdf_preview')
             x_percent = 1.0*x/pdf_preview.allocation.width
             y_percent = 1.0*y/pdf_preview.allocation.height
             self.current_bookmark.x = x_percent
@@ -1298,8 +1298,8 @@ class MainGUI:
     def select_middle_top_pane_item(self, selection):
         liststore, rows = selection.get_selected_rows()
         self.paper_information_pane_model.clear()
-        self.ui.get_widget('paper_information_pane').columns_autosize()
-        paper_information_toolbar = self.ui.get_widget('paper_information_toolbar')
+        self.ui.get_object('paper_information_pane').columns_autosize()
+        paper_information_toolbar = self.ui.get_object('paper_information_toolbar')
         paper_information_toolbar.foreach( paper_information_toolbar.remove )
         self.displayed_paper = None
 
@@ -1339,7 +1339,7 @@ class MainGUI:
 #            description.append( 'References:' )
 #            for ref in paper.reference_set.all():
 #                description.append( ref.line )
-            #self.ui.get_widget('paper_information_pane').get_buffer().set_text( '\n'.join(description) )            
+            #self.ui.get_object('paper_information_pane').get_buffer().set_text( '\n'.join(description) )            
             
             if liststore[rows[0]][8]:
                 button = gtk.ToolButton(gtk.STOCK_HOME)
@@ -1549,7 +1549,7 @@ class MainGUI:
         desktop.open(file)
         
     def update_bookmark_pane_from_paper(self, paper):
-        toolbar_bookmarks = self.ui.get_widget('toolbar_bookmarks')
+        toolbar_bookmarks = self.ui.get_object('toolbar_bookmarks')
         toolbar_bookmarks.foreach( toolbar_bookmarks.remove )
         self.treeview_bookmarks_model.clear()
         if paper:
@@ -1562,8 +1562,8 @@ class MainGUI:
         
     def select_bookmark_pane_item(self, selection=None, bookmark_id=None):
         if selection==None:
-            selection = self.ui.get_widget('treeview_bookmarks').get_selection()
-        toolbar_bookmarks = self.ui.get_widget('toolbar_bookmarks')
+            selection = self.ui.get_object('treeview_bookmarks').get_selection()
+        toolbar_bookmarks = self.ui.get_object('toolbar_bookmarks')
         toolbar_bookmarks.foreach( toolbar_bookmarks.remove )
         
         if bookmark_id!=None:
@@ -1574,10 +1574,10 @@ class MainGUI:
                     selection.select_path( (i,) )
                     return
         
-        try: selected_bookmark_id = self.treeview_bookmarks_model.get_value( self.ui.get_widget('treeview_bookmarks').get_selection().get_selected()[1], 0 )
+        try: selected_bookmark_id = self.treeview_bookmarks_model.get_value( self.ui.get_object('treeview_bookmarks').get_selection().get_selected()[1], 0 )
         except: selected_bookmark_id = -1
         
-        paper_notes = self.ui.get_widget('paper_notes')
+        paper_notes = self.ui.get_object('paper_notes')
         try: 
             if not self.update_paper_notes_handler_id==None:
                 paper_notes.get_buffer().disconnect(self.update_paper_notes_handler_id)
@@ -1711,7 +1711,7 @@ class MainGUI:
             self.refresh_my_library_filter_pane()
     
     def update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(self, rows):
-        middle_top_pane = self.ui.get_widget('middle_top_pane')
+        middle_top_pane = self.ui.get_object('middle_top_pane')
         for column in middle_top_pane.get_columns():
             column.set_sort_indicator(False)
         if self.current_middle_top_pane_refresh_thread_ident==thread.get_ident():
@@ -1726,11 +1726,11 @@ class MainGUI:
         self.active_threads[ thread.get_ident() ] = 'searching local library...'
         try:
             rows = []
-            my_library_filter_pane = self.ui.get_widget('my_library_filter_pane')
+            my_library_filter_pane = self.ui.get_object('my_library_filter_pane')
             
             if not self.current_playlist and self.current_papers==None:
                 
-                search_text = self.ui.get_widget('middle_pane_search').get_text().strip()
+                search_text = self.ui.get_object('middle_pane_search').get_text().strip()
                 if search_text:
                     my_library_filter_pane.hide()
                     paper_ids = set()
@@ -1761,21 +1761,21 @@ class MainGUI:
                         my_library_filter_pane.show()
                     paper_query = Paper.objects.order_by('title')
     
-                    filter_liststore, filter_rows = self.ui.get_widget('author_filter').get_selection().get_selected_rows()
+                    filter_liststore, filter_rows = self.ui.get_object('author_filter').get_selection().get_selected_rows()
                     q = None
                     for filter_row in filter_rows:
                         if q==None: q = Q(authors__id=filter_liststore[filter_row][0])
                         else: q = q | Q(authors__id=filter_liststore[filter_row][0])
                     if q: paper_query = paper_query.filter(q)
                     
-                    filter_liststore, filter_rows = self.ui.get_widget('source_filter').get_selection().get_selected_rows()
+                    filter_liststore, filter_rows = self.ui.get_object('source_filter').get_selection().get_selected_rows()
                     q = None
                     for filter_row in filter_rows:
                         if q==None: q = Q(source__id=filter_liststore[filter_row][0])
                         else: q = q | Q(source__id=filter_liststore[filter_row][0])
                     if q: paper_query = paper_query.filter(q)
                     
-                    filter_liststore, filter_rows = self.ui.get_widget('organization_filter').get_selection().get_selected_rows()
+                    filter_liststore, filter_rows = self.ui.get_object('organization_filter').get_selection().get_selected_rows()
                     q = None
                     for filter_row in filter_rows:
                         if q==None: q = Q(organizations__id=filter_liststore[filter_row][0])
@@ -1798,7 +1798,7 @@ class MainGUI:
                 for author in paper.authors.order_by('id'):
                     authors.append( str(author.name) )
                 if paper.full_text and os.path.isfile( paper.full_text.path ):
-                    icon = self.ui.get_widget('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
+                    icon = self.ui.get_object('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
                 else:
                     icon = None
                 if paper.source:
@@ -1835,13 +1835,13 @@ class MainGUI:
     
     def refresh_my_library_count(self):
         gtk.gdk.threads_enter()
-        selection = self.ui.get_widget('left_pane').get_selection()
+        selection = self.ui.get_object('left_pane').get_selection()
         liststore, rows = selection.get_selected_rows()
         liststore.set_value( self.left_pane_model.get_iter((0,)), 0, '<b>My Library</b>  <span foreground="#888888">(%i)</span>' % Paper.objects.count() )
         gtk.gdk.threads_leave()  
         
     def refresh_middle_pane_from_pubmed(self):
-        search_text = self.ui.get_widget('middle_pane_search').get_text().strip()
+        search_text = self.ui.get_object('middle_pane_search').get_text().strip()
         if not search_text: return
         self.active_threads[ thread.get_ident() ] = 'searching pubmed... (%s)' % search_text        
         rows = []
@@ -1858,7 +1858,7 @@ class MainGUI:
                     info['updated'] = existing_paper.updated
                     if existing_paper.full_text and \
                                os.path.isfile(existing_paper.full_text.path):
-                        info['icon'] = self.ui.get_widget('middle_top_pane').\
+                        info['icon'] = self.ui.get_object('middle_top_pane').\
                                         render_icon(gtk.STOCK_DND,
                                         gtk.ICON_SIZE_MENU)
                 except Paper.DoesNotExist:
@@ -1881,20 +1881,21 @@ class AuthorEditGUI:
             self.author = Author.objects.create()
         else:
             self.author = Author.objects.get(id=author_id)
-        self.ui = gtk.glade.XML(RUN_FROM_DIR + 'author_edit_gui.glade')
-        self.author_edit_dialog = self.ui.get_widget('author_edit_dialog')
+        self.ui = gtk.Builder()
+        self.ui.add_from_file(RUN_FROM_DIR + 'author_edit_gui.xml')
+        self.author_edit_dialog = self.ui.get_object('author_edit_dialog')
         self.author_edit_dialog.connect("delete-event", self.author_edit_dialog.destroy )
-        self.ui.get_widget('button_connect').connect("clicked", lambda x: self.show_connect_menu() )
-        self.ui.get_widget('button_cancel').connect("clicked", lambda x: self.author_edit_dialog.destroy() )
-        self.ui.get_widget('button_delete').connect("clicked", lambda x: self.delete() )
-        self.ui.get_widget('button_save').connect("clicked", lambda x: self.save() )
-        self.ui.get_widget('entry_name').set_text( self.author.name )
-        self.ui.get_widget('label_paper_count').set_text( str( self.author.paper_set.count() ) )
-        self.ui.get_widget('notes').get_buffer().set_text( self.author.notes )
-        self.ui.get_widget('notes').modify_base( gtk.STATE_NORMAL, gtk.gdk.color_parse("#fff7e8") )
-        self.ui.get_widget('rating').set_value( self.author.rating )
+        self.ui.get_object('button_connect').connect("clicked", lambda x: self.show_connect_menu() )
+        self.ui.get_object('button_cancel').connect("clicked", lambda x: self.author_edit_dialog.destroy() )
+        self.ui.get_object('button_delete').connect("clicked", lambda x: self.delete() )
+        self.ui.get_object('button_save').connect("clicked", lambda x: self.save() )
+        self.ui.get_object('entry_name').set_text( self.author.name )
+        self.ui.get_object('label_paper_count').set_text( str( self.author.paper_set.count() ) )
+        self.ui.get_object('notes').get_buffer().set_text( self.author.notes )
+        self.ui.get_object('notes').modify_base( gtk.STATE_NORMAL, gtk.gdk.color_parse("#fff7e8") )
+        self.ui.get_object('rating').set_value( self.author.rating )
 
-        treeview_organizations = self.ui.get_widget('treeview_organizations')
+        treeview_organizations = self.ui.get_object('treeview_organizations')
         # id, org, location
         self.organizations_model = gtk.ListStore( int, str, str )
         treeview_organizations.set_model( self.organizations_model )
@@ -1924,7 +1925,7 @@ class AuthorEditGUI:
         button.set_tooltip(gtk.Tooltips(), 'Add an organization...')
         button.connect( 'clicked', lambda x: self.get_new_organizations_menu().popup(None, None, None, 0, 0) )
         button.show()
-        self.ui.get_widget('toolbar_organizations').insert( button, -1 )
+        self.ui.get_object('toolbar_organizations').insert( button, -1 )
         
         self.author_edit_dialog.show()
         
@@ -1991,10 +1992,10 @@ class AuthorEditGUI:
         
         
     def save(self):
-        self.author.name = self.ui.get_widget('entry_name').get_text()
-        text_buffer = self.ui.get_widget('notes').get_buffer()
+        self.author.name = self.ui.get_object('entry_name').get_text()
+        text_buffer = self.ui.get_object('notes').get_buffer()
         self.author.notes = text_buffer.get_text( text_buffer.get_start_iter(), text_buffer.get_end_iter() )
-        self.author.rating = round( self.ui.get_widget('rating').get_value() )
+        self.author.rating = round( self.ui.get_object('rating').get_value() )
         self.author.save()
         org_ids = set()
         self.organizations_model.foreach( lambda model, path, iter: org_ids.add( model.get_value( iter, 0 ) ) )
@@ -2030,15 +2031,16 @@ class AuthorEditGUI:
 class OrganizationEditGUI:
     def __init__(self, id):
         self.organization = Organization.objects.get(id=id)
-        self.ui = gtk.glade.XML(RUN_FROM_DIR + 'organization_edit_gui.glade')
-        self.edit_dialog = self.ui.get_widget('organization_edit_dialog')
+        self.ui = gtk.Builder()
+        self.ui.add_from_file(RUN_FROM_DIR + 'organization_edit_gui.xml')
+        self.edit_dialog = self.ui.get_object('organization_edit_dialog')
         self.edit_dialog.connect("delete-event", self.edit_dialog.destroy )
-        self.ui.get_widget('button_connect').connect("clicked", lambda x: self.show_connect_menu() )
-        self.ui.get_widget('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
-        self.ui.get_widget('button_delete').connect("clicked", lambda x: self.delete() )
-        self.ui.get_widget('button_save').connect("clicked", lambda x: self.save() )
-        self.ui.get_widget('entry_name').set_text( self.organization.name )
-        self.ui.get_widget('entry_location').set_text( self.organization.location )
+        self.ui.get_object('button_connect').connect("clicked", lambda x: self.show_connect_menu() )
+        self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
+        self.ui.get_object('button_delete').connect("clicked", lambda x: self.delete() )
+        self.ui.get_object('button_save').connect("clicked", lambda x: self.save() )
+        self.ui.get_object('entry_name').set_text( self.organization.name )
+        self.ui.get_object('entry_location').set_text( self.organization.location )
         self.edit_dialog.show()
         
     def delete(self):
@@ -2054,8 +2056,8 @@ class OrganizationEditGUI:
             main_gui.refresh_middle_pane_search()
         
     def save(self):
-        self.organization.name = self.ui.get_widget('entry_name').get_text()
-        self.organization.location = self.ui.get_widget('entry_location').get_text()
+        self.organization.name = self.ui.get_object('entry_name').get_text()
+        self.organization.location = self.ui.get_object('entry_location').get_text()
         self.organization.save()
         self.edit_dialog.destroy()
         main_gui.refresh_middle_pane_search()
@@ -2087,16 +2089,17 @@ class OrganizationEditGUI:
 class SourceEditGUI:
     def __init__(self, id):
         self.source = Source.objects.get(id=id)
-        self.ui = gtk.glade.XML(RUN_FROM_DIR + 'source_edit_gui.glade')
-        self.edit_dialog = self.ui.get_widget('source_edit_dialog')
+        self.ui = gtk.Builder()
+        self.ui.add_from_file(RUN_FROM_DIR + 'source_edit_gui.xml')
+        self.edit_dialog = self.ui.get_object('source_edit_dialog')
         self.edit_dialog.connect("delete-event", self.edit_dialog.destroy )
-        self.ui.get_widget('button_connect').connect("clicked", lambda x: self.show_connect_menu() )
-        self.ui.get_widget('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
-        self.ui.get_widget('button_delete').connect("clicked", lambda x: self.delete() )
-        self.ui.get_widget('button_save').connect("clicked", lambda x: self.save() )
-        self.ui.get_widget('entry_name').set_text( self.source.name )
-        self.ui.get_widget('entry_location').set_text( self.source.location )
-        self.ui.get_widget('entry_issue').set_text( self.source.issue )
+        self.ui.get_object('button_connect').connect("clicked", lambda x: self.show_connect_menu() )
+        self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
+        self.ui.get_object('button_delete').connect("clicked", lambda x: self.delete() )
+        self.ui.get_object('button_save').connect("clicked", lambda x: self.save() )
+        self.ui.get_object('entry_name').set_text( self.source.name )
+        self.ui.get_object('entry_location').set_text( self.source.location )
+        self.ui.get_object('entry_issue').set_text( self.source.issue )
         self.edit_dialog.show()
         
     def delete(self):
@@ -2112,9 +2115,9 @@ class SourceEditGUI:
             main_gui.refresh_middle_pane_search()
         
     def save(self):
-        self.source.name = self.ui.get_widget('entry_name').get_text()
-        self.source.location = self.ui.get_widget('entry_location').get_text()
-        self.source.issue = self.ui.get_widget('entry_issue').get_text()
+        self.source.name = self.ui.get_object('entry_name').get_text()
+        self.source.location = self.ui.get_object('entry_location').get_text()
+        self.source.issue = self.ui.get_object('entry_issue').get_text()
         self.source.save()
         self.edit_dialog.destroy()
         main_gui.refresh_middle_pane_search()
@@ -2146,18 +2149,19 @@ class SourceEditGUI:
 class ReferenceEditGUI:
     def __init__(self, id):
         self.reference = Reference.objects.get(id=id)
-        self.ui = gtk.glade.XML(RUN_FROM_DIR + 'reference_edit_gui.glade')
-        self.edit_dialog = self.ui.get_widget('reference_edit_dialog')
+        self.ui = gtk.Builder()
+        self.ui.add_from_file(RUN_FROM_DIR + 'reference_edit_gui.xml')
+        self.edit_dialog = self.ui.get_object('reference_edit_dialog')
         self.edit_dialog.connect("delete-event", self.edit_dialog.destroy )
-        self.ui.get_widget('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
-        self.ui.get_widget('button_delete').connect("clicked", lambda x: self.delete() )
-        self.ui.get_widget('button_save').connect("clicked", lambda x: self.save() )
-        self.ui.get_widget('entry_line_from_referencing_paper').set_text( self.reference.line_from_referencing_paper )
-        self.ui.get_widget('entry_doi_from_referencing_paper').set_text( self.reference.doi_from_referencing_paper )
-        self.ui.get_widget('entry_url_from_referencing_paper').set_text( self.reference.url_from_referencing_paper )
+        self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
+        self.ui.get_object('button_delete').connect("clicked", lambda x: self.delete() )
+        self.ui.get_object('button_save').connect("clicked", lambda x: self.save() )
+        self.ui.get_object('entry_line_from_referencing_paper').set_text( self.reference.line_from_referencing_paper )
+        self.ui.get_object('entry_doi_from_referencing_paper').set_text( self.reference.doi_from_referencing_paper )
+        self.ui.get_object('entry_url_from_referencing_paper').set_text( self.reference.url_from_referencing_paper )
         
-        combobox_referencing_paper = self.ui.get_widget('combobox_referencing_paper')
-        combobox_referenced_paper = self.ui.get_widget('combobox_referenced_paper')
+        combobox_referencing_paper = self.ui.get_object('combobox_referencing_paper')
+        combobox_referenced_paper = self.ui.get_object('combobox_referenced_paper')
         papers = [ ( paper.id, truncate_long_str(paper.pretty_string()) ) for paper in Paper.objects.order_by('title') ]
         papers.insert(0, ( -1, '(not in local library)' ))
         set_model_from_list( combobox_referencing_paper, papers )
@@ -2185,14 +2189,14 @@ class ReferenceEditGUI:
             self.edit_dialog.destroy()
         
     def save(self):
-        self.reference.line_from_referencing_paper = self.ui.get_widget('entry_line_from_referencing_paper').get_text()
-        self.reference.doi_from_referencing_paper = self.ui.get_widget('entry_doi_from_referencing_paper').get_text()
-        self.reference.url_from_referencing_paper = self.ui.get_widget('entry_url_from_referencing_paper').get_text()
-        print "self.ui.get_widget('combobox_referencing_paper').get_active()", self.ui.get_widget('combobox_referencing_paper').get_active()
-        referencing_paper_id = self.ui.get_widget('combobox_referencing_paper').get_model()[ self.ui.get_widget('combobox_referencing_paper').get_active() ][0]
+        self.reference.line_from_referencing_paper = self.ui.get_object('entry_line_from_referencing_paper').get_text()
+        self.reference.doi_from_referencing_paper = self.ui.get_object('entry_doi_from_referencing_paper').get_text()
+        self.reference.url_from_referencing_paper = self.ui.get_object('entry_url_from_referencing_paper').get_text()
+        print "self.ui.get_object('combobox_referencing_paper').get_active()", self.ui.get_object('combobox_referencing_paper').get_active()
+        referencing_paper_id = self.ui.get_object('combobox_referencing_paper').get_model()[ self.ui.get_object('combobox_referencing_paper').get_active() ][0]
         try: self.reference.referencing_paper = Paper.objects.get(id=referencing_paper_id)
         except: self.reference.referencing_paper = None
-        referenced_paper_id = self.ui.get_widget('combobox_referenced_paper').get_model()[ self.ui.get_widget('combobox_referenced_paper').get_active() ][0]
+        referenced_paper_id = self.ui.get_object('combobox_referenced_paper').get_model()[ self.ui.get_object('combobox_referenced_paper').get_active() ][0]
         try: self.reference.referenced_paper = Paper.objects.get(id=referenced_paper_id)
         except: self.reference.referenced_paper = None
         self.reference.save()
@@ -2203,18 +2207,19 @@ class ReferenceEditGUI:
 class CitationEditGUI:
     def __init__(self, id):
         self.reference = Reference.objects.get(id=id)
-        self.ui = gtk.glade.XML(RUN_FROM_DIR + 'citation_edit_gui.glade')
-        self.edit_dialog = self.ui.get_widget('citation_edit_dialog')
+        self.ui = gtk.Builder()
+        self.ui.add_from_file(RUN_FROM_DIR + 'citation_edit_gui.xml')
+        self.edit_dialog = self.ui.get_object('citation_edit_dialog')
         self.edit_dialog.connect("delete-event", self.edit_dialog.destroy )
-        self.ui.get_widget('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
-        self.ui.get_widget('button_delete').connect("clicked", lambda x: self.delete() )
-        self.ui.get_widget('button_save').connect("clicked", lambda x: self.save() )
-        self.ui.get_widget('entry_line_from_referenced_paper').set_text( self.reference.line_from_referenced_paper )
-        self.ui.get_widget('entry_doi_from_referenced_paper').set_text( self.reference.doi_from_referenced_paper )
-        self.ui.get_widget('entry_url_from_referenced_paper').set_text( self.reference.url_from_referenced_paper )
+        self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
+        self.ui.get_object('button_delete').connect("clicked", lambda x: self.delete() )
+        self.ui.get_object('button_save').connect("clicked", lambda x: self.save() )
+        self.ui.get_object('entry_line_from_referenced_paper').set_text( self.reference.line_from_referenced_paper )
+        self.ui.get_object('entry_doi_from_referenced_paper').set_text( self.reference.doi_from_referenced_paper )
+        self.ui.get_object('entry_url_from_referenced_paper').set_text( self.reference.url_from_referenced_paper )
         
-        combobox_referencing_paper = self.ui.get_widget('combobox_referencing_paper')
-        combobox_referenced_paper = self.ui.get_widget('combobox_referenced_paper')
+        combobox_referencing_paper = self.ui.get_object('combobox_referencing_paper')
+        combobox_referenced_paper = self.ui.get_object('combobox_referenced_paper')
         papers = [ ( paper.id, truncate_long_str(paper.pretty_string()) ) for paper in Paper.objects.order_by('title') ]
         papers.insert(0, ( -1, '(not in local library)' ))
         set_model_from_list( combobox_referencing_paper, papers )
@@ -2242,13 +2247,13 @@ class CitationEditGUI:
             self.edit_dialog.destroy()
         
     def save(self):
-        self.reference.line_from_referenced_paper = self.ui.get_widget('entry_line_from_referenced_paper').get_text()
-        self.reference.doi_from_referenced_paper = self.ui.get_widget('entry_doi_from_referenced_paper').get_text()
-        self.reference.url_from_referenced_paper = self.ui.get_widget('entry_url_from_referenced_paper').get_text()
-        referencing_paper_id = self.ui.get_widget('combobox_referencing_paper').get_model()[ self.ui.get_widget('combobox_referencing_paper').get_active() ][0]
+        self.reference.line_from_referenced_paper = self.ui.get_object('entry_line_from_referenced_paper').get_text()
+        self.reference.doi_from_referenced_paper = self.ui.get_object('entry_doi_from_referenced_paper').get_text()
+        self.reference.url_from_referenced_paper = self.ui.get_object('entry_url_from_referenced_paper').get_text()
+        referencing_paper_id = self.ui.get_object('combobox_referencing_paper').get_model()[ self.ui.get_object('combobox_referencing_paper').get_active() ][0]
         try: self.reference.referencing_paper = Paper.objects.get(id=referencing_paper_id)
         except: self.reference.referencing_paper = None
-        referenced_paper_id = self.ui.get_widget('combobox_referenced_paper').get_model()[ self.ui.get_widget('combobox_referenced_paper').get_active() ][0]
+        referenced_paper_id = self.ui.get_object('combobox_referenced_paper').get_model()[ self.ui.get_object('combobox_referenced_paper').get_active() ][0]
         try: self.reference.referenced_paper = Paper.objects.get(id=referenced_paper_id)
         except: self.reference.referenced_paper = None
         self.reference.save()
@@ -2259,24 +2264,25 @@ class CitationEditGUI:
 class PaperEditGUI:
     def __init__(self, id):
         self.paper = Paper.objects.get(id=id)
-        self.ui = gtk.glade.XML(RUN_FROM_DIR + 'paper_edit_gui.glade')
-        self.edit_dialog = self.ui.get_widget('paper_edit_dialog')
+        self.ui = gtk.Builder()
+        self.ui.add_from_file(RUN_FROM_DIR + 'paper_edit_gui.xml')
+        self.edit_dialog = self.ui.get_object('paper_edit_dialog')
         self.edit_dialog.connect("delete-event", self.edit_dialog.destroy )
-        self.ui.get_widget('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
-        self.ui.get_widget('button_delete').connect("clicked", lambda x: self.delete() )
-        self.ui.get_widget('button_save').connect("clicked", lambda x: self.save() )
-        self.ui.get_widget('toolbutton_refresh_from_pdf').connect("clicked", lambda x: self.toolbutton_refresh_extracted_text_from_pdf() )
-        self.ui.get_widget('entry_title').set_text( self.paper.title )
-        self.ui.get_widget('entry_doi').set_text( self.paper.doi )
-        self.ui.get_widget('entry_import_url').set_text( self.paper.import_url )
-        self.ui.get_widget('textview_abstract').get_buffer().set_text( self.paper.abstract )
-        self.ui.get_widget('textview_bibtex').get_buffer().set_text( self.paper.bibtex )
-        self.ui.get_widget('textview_extracted_text').get_buffer().set_text( self.paper.extracted_text )
-        if self.paper.full_text: self.ui.get_widget('filechooserbutton').set_filename( self.paper.full_text.path )
-        self.ui.get_widget('rating').set_value( self.paper.rating )
-        self.ui.get_widget('spinbutton_read_count').set_value( self.paper.read_count )
+        self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
+        self.ui.get_object('button_delete').connect("clicked", lambda x: self.delete() )
+        self.ui.get_object('button_save').connect("clicked", lambda x: self.save() )
+        self.ui.get_object('toolbutton_refresh_from_pdf').connect("clicked", lambda x: self.toolbutton_refresh_extracted_text_from_pdf() )
+        self.ui.get_object('entry_title').set_text( self.paper.title )
+        self.ui.get_object('entry_doi').set_text( self.paper.doi )
+        self.ui.get_object('entry_import_url').set_text( self.paper.import_url )
+        self.ui.get_object('textview_abstract').get_buffer().set_text( self.paper.abstract )
+        self.ui.get_object('textview_bibtex').get_buffer().set_text( self.paper.bibtex )
+        self.ui.get_object('textview_extracted_text').get_buffer().set_text( self.paper.extracted_text )
+        if self.paper.full_text: self.ui.get_object('filechooserbutton').set_filename( self.paper.full_text.path )
+        self.ui.get_object('rating').set_value( self.paper.rating )
+        self.ui.get_object('spinbutton_read_count').set_value( self.paper.read_count )
 
-        treeview_authors = self.ui.get_widget('treeview_authors')
+        treeview_authors = self.ui.get_object('treeview_authors')
         # id, name
         self.authors_model = gtk.ListStore( int, str )
         treeview_authors.set_model( self.authors_model )
@@ -2294,7 +2300,7 @@ class PaperEditGUI:
         button.set_tooltip(gtk.Tooltips(), 'Add an author...')
         button.connect( 'clicked', lambda x: self.get_new_authors_menu().popup(None, None, None, 0, 0) )
         button.show()
-        self.ui.get_widget('toolbar_authors').insert( button, -1 )
+        self.ui.get_object('toolbar_authors').insert( button, -1 )
 
         self.init_references_tab()
         self.init_citations_tab()
@@ -2306,11 +2312,11 @@ class PaperEditGUI:
         self.authors_model.clear()
         for author in self.paper.get_authors_in_order():
             self.authors_model.append( ( author.id, author.name ) )
-        self.ui.get_widget('textview_extracted_text').get_buffer().set_text( self.paper.extracted_text )
-        self.ui.get_widget('entry_title').set_text( self.paper.title )
+        self.ui.get_object('textview_extracted_text').get_buffer().set_text( self.paper.extracted_text )
+        self.ui.get_object('entry_title').set_text( self.paper.title )
         
     def init_references_tab(self):
-        treeview_references = self.ui.get_widget('treeview_references')
+        treeview_references = self.ui.get_object('treeview_references')
         # id, line, number, pix_buf
         self.references_model = gtk.ListStore( int, str, str, gtk.gdk.Pixbuf )
         treeview_references.set_model( self.references_model )
@@ -2339,10 +2345,10 @@ class PaperEditGUI:
         button.set_tooltip(gtk.Tooltips(), 'Add a reference...')
         button.connect( 'clicked', lambda x: self.get_new_authors_menu().popup(None, None, None, 0, 0) )
         button.show()
-        #self.ui.get_widget('toolbar_references').insert( button, -1 )
+        #self.ui.get_object('toolbar_references').insert( button, -1 )
         
     def init_citations_tab(self):
-        treeview_citations = self.ui.get_widget('treeview_citations')
+        treeview_citations = self.ui.get_object('treeview_citations')
         # id, line, number, pix_buf
         self.citations_model = gtk.ListStore( int, str, str, gtk.gdk.Pixbuf )
         treeview_citations.set_model( self.citations_model )
@@ -2371,7 +2377,7 @@ class PaperEditGUI:
         button.set_tooltip(gtk.Tooltips(), 'Add a reference...')
         button.connect( 'clicked', lambda x: self.get_new_authors_menu().popup(None, None, None, 0, 0) )
         button.show()
-        #self.ui.get_widget('toolbar_references').insert( button, -1 )
+        #self.ui.get_object('toolbar_references').insert( button, -1 )
     
     def delete(self):
         dialog = gtk.MessageDialog( type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL )
@@ -2386,16 +2392,16 @@ class PaperEditGUI:
             main_gui.refresh_middle_pane_search()
         
     def save(self):
-        self.paper.title = self.ui.get_widget('entry_title').get_text()
-        self.paper.doi = self.ui.get_widget('entry_doi').get_text()
-        self.paper.import_url = self.ui.get_widget('entry_import_url').get_text()
-        text_buffer = self.ui.get_widget('textview_abstract').get_buffer()
+        self.paper.title = self.ui.get_object('entry_title').get_text()
+        self.paper.doi = self.ui.get_object('entry_doi').get_text()
+        self.paper.import_url = self.ui.get_object('entry_import_url').get_text()
+        text_buffer = self.ui.get_object('textview_abstract').get_buffer()
         self.paper.abstract = text_buffer.get_text( text_buffer.get_start_iter(), text_buffer.get_end_iter() )
-        text_buffer = self.ui.get_widget('textview_bibtex').get_buffer()
+        text_buffer = self.ui.get_object('textview_bibtex').get_buffer()
         self.paper.bibtex = text_buffer.get_text( text_buffer.get_start_iter(), text_buffer.get_end_iter() )
-        self.paper.rating = round( self.ui.get_widget('rating').get_value() )
-        self.paper.read_count = self.ui.get_widget('spinbutton_read_count').get_value()
-        new_file_name = self.ui.get_widget('filechooserbutton').get_filename()
+        self.paper.rating = round( self.ui.get_object('rating').get_value() )
+        self.paper.read_count = self.ui.get_object('spinbutton_read_count').get_value()
+        new_file_name = self.ui.get_object('filechooserbutton').get_filename()
         if new_file_name and self.paper.full_text and new_file_name!=self.paper.full_text.path:
             try:
                 ext = new_file_name[ new_file_name.rfind('.')+1: ]
@@ -2505,17 +2511,18 @@ class PaperEditGUI:
         
 class PreferencesGUI:
     def __init__(self):
-        self.ui = gtk.glade.XML(RUN_FROM_DIR + 'preferences_gui.glade')
-        self.edit_dialog = self.ui.get_widget('preferences_dialog')
+        self.ui = gtk.Builder()
+        self.ui.add_from_file(RUN_FROM_DIR + 'preferences_gui.xml')
+        self.edit_dialog = self.ui.get_object('preferences_dialog')
         self.edit_dialog.connect("delete-event", self.edit_dialog.destroy )
-        self.ui.get_widget('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
-        self.ui.get_widget('button_save').connect("clicked", lambda x: self.save() )
+        self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy() )
+        self.ui.get_object('button_save').connect("clicked", lambda x: self.save() )
         self.edit_dialog.show()
         
     def save(self):
-        self.paper.title = self.ui.get_widget('entry_title').get_text()
-        self.paper.doi = self.ui.get_widget('entry_doi').get_text()
-        text_buffer = self.ui.get_widget('textview_abstract').get_buffer()
+        self.paper.title = self.ui.get_object('entry_title').get_text()
+        self.paper.doi = self.ui.get_object('entry_doi').get_text()
+        text_buffer = self.ui.get_object('textview_abstract').get_buffer()
         self.paper.abstract = text_buffer.get_text( text_buffer.get_start_iter(), text_buffer.get_end_iter() )
         self.paper.save()
         self.edit_dialog.destroy()
