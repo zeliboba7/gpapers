@@ -82,3 +82,6 @@ class PubMedSearch(object):
             papers.append(info)
 
         return papers
+
+    def __str__(self):
+        return "PubMed"

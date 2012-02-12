@@ -1,15 +1,25 @@
-import urllib, traceback
+import urllib, traceback, thread
 
 from BeautifulSoup import BeautifulSoup
 from django.template import defaultfilters
 
 import openanything
 from logger import log_debug, log_info, log_error
-from importer import html_strip
+from importer import html_strip, update_paper_from_bibtex_html, find_and_attach_pdf
 
 BASE_URL = 'http://scholar.google.com'
 
+
 class GoogleScholarSearch(object):
+
+    def __init__(self):
+        # set our google scholar prefs (cookie-based)
+        #FIXME: This is blocking...
+        log_debug('Google Scholar: Trying to set a cookie so that we get 100 results and bibtex links')
+        #FIXME: Does not seem to work...
+        params = openanything.fetch(BASE_URL + \
+                           '/scholar_setprefs?num=100&scis=yes&scisf=4&submit=Save+Preferences')
+        log_debug('Google Scholar: Returned status: %d' % params['status'])
 
     def unique_key(self):
         return 'import_url'
@@ -26,7 +36,7 @@ class GoogleScholarSearch(object):
         try:
             query = BASE_URL + '/scholar?q=%s' % \
                             defaultfilters.urlencode(search_text)
-            log_debug('Starting google scholar search for query "%s"' % query)
+            log_info('Starting google scholar search for query "%s"' % query)
             params = openanything.fetch(query)
             if params['status'] == 200 or params['status'] == 302:
                 node = BeautifulSoup(params['data'],
@@ -77,6 +87,10 @@ class GoogleScholarSearch(object):
                             paper['abstract'] = html_strip(result.findAll('div', attrs='gs_rs')[0].text)
                         except:
                             pass
+
+                        # Also attach the html data so it can be used later for
+                        # importing the document
+                        paper['data'] = result
                     except:
                         traceback.print_exc()
                     papers.append(paper)
@@ -87,3 +101,26 @@ class GoogleScholarSearch(object):
                           (params['status'], search_text))
         except:
             traceback.print_exc()
+
+    def import_paper(self, data, paper=None):
+        log_info('Trying to import google scholar citation "%s"' % paper.title)
+        try:
+            citations = data.findAll('div', {'class': 'gs_fl'})[0]
+            log_debug('Citations: %s' % str(citations))
+            for link in citations.findAll('a'):
+                log_debug('Link: %s' % str(link))
+                if link['href'].startswith('/scholar.bib'):
+                    log_debug('Found BibTex link: ', link['href'])
+                    data_bibtex = openanything.fetch(BASE_URL + link['href'])
+                    if data_bibtex['status'] == 200 or data_bibtex['status'] == 302:
+                        paper = update_paper_from_bibtex_html(paper, data_bibtex['data'])
+                    return
+            link = data.findAll('div', {'class': 'gs_ggs gs_fl'})[0]
+            find_and_attach_pdf(paper, urls=[x['href'] for x in link.findAll('a') ])
+
+            return paper
+        except:
+            traceback.print_exc()
+
+    def __str__(self):
+        return "Google Scholar"
