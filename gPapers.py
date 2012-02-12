@@ -238,8 +238,13 @@ def import_citation_via_middle_top_pane_row(row):
     import_url = row[8]
     doi = row[9]
     pubmed_id = row[13]
-
-    paper, created = importer.get_or_create_paper_via(id=paper_id, doi=doi, pubmed_id=pubmed_id, import_url=import_url, title=title)
+    data = row[14]
+    provider = row[15]
+    paper, created = importer.get_or_create_paper_via(id=paper_id, doi=doi,
+                                                      pubmed_id=pubmed_id,
+                                                      import_url=import_url,
+                                                      title=title, data=data,
+                                                      provider=provider)
 
     if title: paper.title = title
     if abstract: paper.abstract = abstract
@@ -287,7 +292,7 @@ def show_html_error_dialog(code):
     error.run()
     gtk.gdk.threads_leave()
 
-def row_from_dictionary(info):
+def row_from_dictionary(info, provider=None):
     assert info is not None
 
     row = (
@@ -305,9 +310,12 @@ def row_from_dictionary(info):
             info.get('updated'), # updated
             '', # empty_str
             info.get('pubmed_id'), # pubmed_id
+            info.get('data'),
+            provider
     )
 
     return row
+
 
 class MainGUI:
 
@@ -909,8 +917,8 @@ class MainGUI:
 
     def init_middle_top_pane(self):
         middle_top_pane = self.ui.get_object('middle_top_pane')
-        # id, authors, title, journal, year, rating, abstract, icon, import_url, doi, created, updated, empty_str, pubmed_id
-        self.middle_top_pane_model = gtk.ListStore(int, str, str, str, str, int, str, gtk.gdk.Pixbuf, str, str, str, str, str, str)
+        # id, authors, title, journal, year, rating, abstract, icon, import_url, doi, created, updated, empty_str, pubmed_id, data, search provider
+        self.middle_top_pane_model = gtk.ListStore(int, str, str, str, str, int, str, gtk.gdk.Pixbuf, str, str, str, str, str, str, object, object)
         middle_top_pane.set_model(self.middle_top_pane_model)
         middle_top_pane.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
         middle_top_pane.connect('button-press-event', self.handle_middle_top_pane_button_press_event)
@@ -1834,6 +1842,8 @@ class MainGUI:
                     paper.updated.strftime(DATE_FORMAT), # updated
                     '', # empty_str
                     paper.pubmed_id, # pubmed_id
+                    None,
+                    None
                 ))
             self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
             self.refresh_my_library_count()
@@ -1876,7 +1886,7 @@ class MainGUI:
                     pass
 
                 # Add information to table 
-                rows.append(row_from_dictionary(info))
+                rows.append(row_from_dictionary(info, search_provider))
 
             self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
         except:
