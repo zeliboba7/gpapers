@@ -11,6 +11,9 @@ ESUMMARY_QUERY = 'esummary.fcgi?db=pubmed&query_key=%s&WebEnv=%s'
 
 class PubMedSearch(object):
 
+    def __init__(self):
+        self.search_cache = {}
+
     def unique_key(self):
         return 'pubmed_id'
 
@@ -21,6 +24,9 @@ class PubMedSearch(object):
         '''
         if not search_text:
             return []  # Do not make empty queries
+
+        if search_text in self.search_cache:
+            return self.search_cache[search_text]
 
         # First do a query only for ids that is saved on the server
         log_debug('Starting Pubmed query for string "%s"' % search_text)
@@ -37,6 +43,7 @@ class PubMedSearch(object):
         # Check wether there were any hits at all
         if int(parsed_response.esearchresult.count.string) == 0:
             log_info('No hits for search string "%s"' % search_text)
+            self.search_cache[search_text] = []
             return []
 
         web_env = parsed_response.esearchresult.webenv.string
@@ -81,6 +88,7 @@ class PubMedSearch(object):
 
             papers.append(info)
 
+        self.search_cache[search_text] = papers
         return papers
 
     def __str__(self):
