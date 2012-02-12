@@ -7,6 +7,8 @@ import openanything
 from logger import log_debug, log_info, log_error
 from importer import html_strip
 
+BASE_URL = 'http://scholar.google.com'
+
 class GoogleScholarSearch(object):
 
     def unique_key(self):
@@ -22,22 +24,25 @@ class GoogleScholarSearch(object):
 
         papers = []
         try:
-            query = 'http://scholar.google.com/scholar?q=%s' % defaultfilters.urlencode(search_text)
+            query = BASE_URL + '/scholar?q=%s' % \
+                            defaultfilters.urlencode(search_text)
             log_debug('Starting google scholar search for query "%s"' % query)
             params = openanything.fetch(query)
             if params['status'] == 200 or params['status'] == 302:
                 node = BeautifulSoup(params['data'],
                                      convertEntities=BeautifulSoup.HTML_ENTITIES)
-                for result in node.findAll('div', attrs={'class' : 'gs_r'}):
+                for result in node.findAll('div', attrs={'class': 'gs_r'}):
                     paper = {}
                     #print '==========================================='
 
                     try:
-                        title_node = result.findAll('h3', attrs={'class' : 'gs_rt'})[0]
+                        title_node = result.findAll('h3',
+                                                    attrs={'class': 'gs_rt'})[0]
                         #Can be a link or plain text
                         title_link = title_node.findAll('a')
                         if title_link:
-                            log_debug('title_link: %s' % title_link[0].prettify())
+                            log_debug('title_link: %s' % \
+                                      title_link[0].prettify())
                             paper['title'] = title_link[0].string
                             paper['import_url'] = title_link[0]['href']
                         else:
@@ -45,13 +50,15 @@ class GoogleScholarSearch(object):
                             paper['import_url'] = ''
 
                         if not paper['import_url'].startswith('http'):
-                            paper['import_url'] = 'http://scholar.google.com' + paper['import_url']
+                            paper['import_url'] = BASE_URL + paper['import_url']
 
                         try:
                             author_journal_publisher = result.findAll('div',
                                                      attrs={'class' : 'gs_a'})[0]
-                            log_debug('Author string: %s' % str(author_journal_publisher.text))
-                            authors, journal, publisher = author_journal_publisher.text.split(' - ')
+                            log_debug('Author string: %s' % \
+                                             str(author_journal_publisher.text))
+                            authors, journal, publisher = \
+                                      author_journal_publisher.text.split(' - ')
                             paper['authors'] = authors.split(',')
                             journal_year = journal.split(',')
                             if len(journal_year) == 2:
@@ -67,7 +74,7 @@ class GoogleScholarSearch(object):
                             pass
 
                         try:
-                            paper['abstract'] = html_strip(result.findAll('div', attrs='gs_rs')[0].string)
+                            paper['abstract'] = html_strip(result.findAll('div', attrs='gs_rs')[0].text)
                         except:
                             pass
                     except:
