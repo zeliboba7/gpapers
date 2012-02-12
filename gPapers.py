@@ -253,7 +253,8 @@ def import_citation_via_middle_top_pane_row(row):
     if pubmed_id: paper.pubmed_id = pubmed_id
 
     paper.save()
-
+    if created:
+        log_debug('Paper created: %s' % paper)
     importer.import_citation(paper.import_url, paper=paper, callback=main_gui.refresh_middle_pane_search)
 
 
@@ -839,7 +840,9 @@ class MainGUI:
         self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>highest rated</i>', gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'emblem-favorite.png')), -4, False))
 
         self.left_pane_model.append(None, ('<b>External search</b>', left_pane.render_icon(gtk.STOCK_NETWORK, gtk.ICON_SIZE_MENU), -1, False))
-        self.left_pane_model.append(self.left_pane_model.get_iter((1),), ('PubMed', gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_pubmed.ico')), -1, False))
+        self.left_pane_model.append(self.left_pane_model.get_iter((1),),
+                                    ('PubMed',
+                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_pubmed.ico')), -1, False))
         for playlist in Playlist.objects.filter(parent='3'):
             if playlist.search_text:
                 icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
@@ -847,7 +850,13 @@ class MainGUI:
                 icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
             self.left_pane_model.append(self.left_pane_model.get_iter((3),), (playlist.title, icon, playlist.id, True))
 
-        self.left_pane_model.append(self.left_pane_model.get_iter((1),), ('Google Scholar', gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_google.ico')), -1, False))
+        self.left_pane_model.append(self.left_pane_model.get_iter((1),),
+                                    ('Google Scholar',
+                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_google.ico')), -1, False))
+
+        self.left_pane_model.append(self.left_pane_model.get_iter((1),),
+                                    ('JSTOR',
+                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_google.ico')), -1, False))
 
         left_pane.expand_all()
         self.ui.get_object('left_pane').get_selection().select_path((0,))
