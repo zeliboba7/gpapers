@@ -25,7 +25,6 @@ import pygtk
 pygtk.require("2.0")
 import gobject
 import gtk
-import gtk.glade
 import gnome
 import gnome.ui
 import pango
