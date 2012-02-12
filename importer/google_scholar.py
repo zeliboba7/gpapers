@@ -21,6 +21,11 @@ class GoogleScholarSearch(object):
                            '/scholar_setprefs?num=100&scis=yes&scisf=4&submit=Save+Preferences')
         log_debug('Google Scholar: Returned status: %d' % params['status'])
 
+        # Remember previous search results so that no new search is necessary.
+        # Useful especially if switching between libraries/searches in the left
+        # pane
+        self.search_cache = {}
+
     def unique_key(self):
         return 'import_url'
 
@@ -31,6 +36,9 @@ class GoogleScholarSearch(object):
         '''
         if not search_text:
             return []
+
+        if search_text in self.search_cache:
+            return self.search_cache[search_text]
 
         papers = []
         try:
@@ -95,6 +103,7 @@ class GoogleScholarSearch(object):
                         traceback.print_exc()
                     papers.append(paper)
 
+                self.search_cache[search_text] = papers
                 return papers
             else:
                 log_error('Google scholar replied with error code %d for query: %s' % \
