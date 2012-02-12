@@ -856,7 +856,7 @@ class MainGUI:
 
         self.left_pane_model.append(self.left_pane_model.get_iter((1),),
                                     ('JSTOR',
-                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_google.ico')), -1, False))
+                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_jstor.ico')), -1, False))
 
         left_pane.expand_all()
         self.ui.get_object('left_pane').get_selection().select_path((0,))
