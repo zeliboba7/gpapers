@@ -8,6 +8,7 @@ BASE_URL = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
 ESEARCH_QUERY = 'esearch.fcgi?db=pubmed&term=%s&usehistory=y'
 ESUMMARY_QUERY = 'esummary.fcgi?db=pubmed&query_key=%s&WebEnv=%s'
 
+
 class PubMedSearch(object):
 
     def unique_key(self):
@@ -19,7 +20,7 @@ class PubMedSearch(object):
         query
         '''
         if not search_text:
-            return [] # Do not make empty queries
+            return []  # Do not make empty queries
 
         # First do a query only for ids that is saved on the server
         log_debug('Starting Pubmed query for string "%s"' % search_text)
@@ -42,7 +43,7 @@ class PubMedSearch(object):
         query_key = parsed_response.esearchresult.querykey.string
         response.close()
 
-        # Download the summaries    
+        # Download the summaries
         log_debug('Continuing Pubmed query (downloading summaries)')
         query = BASE_URL + ESUMMARY_QUERY % (query_key, web_env)
         response = urllib.urlopen(query)
@@ -59,18 +60,20 @@ class PubMedSearch(object):
             # Extract information
             info['pubmed_id'] = str(document.id.string)
 
-            doi = document.findAll('item', {'name' : 'doi'})
+            doi = document.findAll('item', {'name': 'doi'})
             if doi:
                 info['doi'] = doi[0].string
                 info['import_url'] = 'http://dx.doi.org/' + info['doi']
 
-            info['title'] = document.findAll('item', {'name' : 'Title'})[0].string
+            info['title'] = document.findAll('item',
+                                             {'name': 'Title'})[0].string
             info['authors'] = [str(author.string) for author in \
-                                      document.findAll('item', {'name' : 'Author'})]
+                                      document.findAll('item',
+                                                       {'name': 'Author'})]
             info['journal'] = document.findAll('item',
-                                              {'name' : 'FullJournalName'})[0].string
+                                              {'name': 'FullJournalName'})[0].string
 
-            pubdate = document.findAll('item', {'name' : 'PubDate'})
+            pubdate = document.findAll('item', {'name': 'PubDate'})
             if pubdate and pubdate[0]:
                 info['year'] = pubdate[0].string[:4]
 
