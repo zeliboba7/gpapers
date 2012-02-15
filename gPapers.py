@@ -76,7 +76,7 @@ from gPapers.models import *
 import importer
 from importer import pango_escape
 from importer import html_strip, pango_escape, get_md5_hexdigest_from_data
-from importer import pubmed, google_scholar
+from importer import pubmed, google_scholar, jstor
 
 NOTE_ICON = gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'note.png'))
 BOOKMARK_ICON = gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'bookmark.png'))
@@ -420,6 +420,7 @@ class MainGUI:
         self.refresh_left_pane()
         self.pubmed_search = pubmed.PubMedSearch()
         self.google_scholar_search = google_scholar.GoogleScholarSearch()
+        self.jstor_search = jstor.JSTORSearch()
         main_window.show()
 
     def init_busy_notifier(self):
@@ -839,24 +840,32 @@ class MainGUI:
         self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>never read</i>', gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'applications-development.png')), -5, False))
         self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>highest rated</i>', gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'emblem-favorite.png')), -4, False))
 
-        self.left_pane_model.append(None, ('<b>External search</b>', left_pane.render_icon(gtk.STOCK_NETWORK, gtk.ICON_SIZE_MENU), -1, False))
-        self.left_pane_model.append(self.left_pane_model.get_iter((1),),
-                                    ('PubMed',
+        self.left_pane_model.append(None, ('PubMed',
                                      gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_pubmed.ico')), -1, False))
+        for playlist in Playlist.objects.filter(parent='1'):
+            if playlist.search_text:
+                icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
+            else:
+                icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
+            self.left_pane_model.append(self.left_pane_model.get_iter((1),), (playlist.title, icon, playlist.id, True))
+
+        self.left_pane_model.append(None, ('Google Scholar',
+                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_google.ico')), -1, False))
+        for playlist in Playlist.objects.filter(parent='2'):
+            if playlist.search_text:
+                icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
+            else:
+                icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
+            self.left_pane_model.append(self.left_pane_model.get_iter((2),), (playlist.title, icon, playlist.id, True))
+
+        self.left_pane_model.append(None, ('JSTOR',
+                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_jstor.ico')), -1, False))
         for playlist in Playlist.objects.filter(parent='3'):
             if playlist.search_text:
                 icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
             else:
                 icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
             self.left_pane_model.append(self.left_pane_model.get_iter((3),), (playlist.title, icon, playlist.id, True))
-
-        self.left_pane_model.append(self.left_pane_model.get_iter((1),),
-                                    ('Google Scholar',
-                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_google.ico')), -1, False))
-
-        self.left_pane_model.append(self.left_pane_model.get_iter((1),),
-                                    ('JSTOR',
-                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_jstor.ico')), -1, False))
 
         left_pane.expand_all()
         self.ui.get_object('left_pane').get_selection().select_path((0,))
@@ -910,18 +919,16 @@ class MainGUI:
             self.last_middle_pane_search_string = ''
             self.ui.get_object('middle_pane_search').set_text('')
 
+        log_debug('rows[0][0]: %d' % rows[0][0])
         if rows[0][0] == 0:
             self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(self.refresh_middle_pane_from_my_library, (True,))
-        else:
-            self.ui.get_object('my_library_filter_pane').hide()
+        elif rows[0][0] == 1:
+            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.pubmed_search), ())
+        elif rows[0][0] == 2:
+            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.google_scholar_search), ())
+        elif rows[0][0] == 3:
+            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.jstor_search), ())
 
-        if rows[0][0] == 1: #External search
-            if not len(rows[0]) > 1:
-                pass # 'External search' title selected FIXME: Should be forbidden... 
-            elif rows[0][1] == 0:
-                self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.pubmed_search), ())
-            elif rows[0][1] == 1:
-                self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.google_scholar_search), ())
         self.select_middle_top_pane_item(self.ui.get_object('middle_top_pane').get_selection())
 
     def init_middle_top_pane(self):
@@ -1869,6 +1876,7 @@ class MainGUI:
         gtk.gdk.threads_leave()
 
     def refresh_middle_pane_from_external(self, search_provider):
+        log_debug('Starting external search in %s' % search_provider)
         search_text = self.ui.get_object('middle_pane_search').get_text().strip()
         if not search_text: return
         self.active_threads[ thread.get_ident() ] = 'searching %s... (%s)' % (search_provider, search_text)
