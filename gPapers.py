@@ -469,7 +469,6 @@ class MainGUI:
         self.ui.get_object('menuitem_import_doi').connect('activate', self.import_doi)
         self.ui.get_object('menuitem_import_file').connect('activate', self.import_file)
         self.ui.get_object('menuitem_import_directory').connect('activate', self.import_directory)
-        self.ui.get_object('menuitem_preferences').connect('activate', lambda x: PreferencesGUI())
         self.ui.get_object('menuitem_import_bibtex').connect('activate', self.import_bibtex)
         self.ui.get_object('menuitem_author_graph').connect('activate', lambda x: self.graph_authors())
         self.ui.get_object('menuitem_paper_graph').connect('activate', lambda x: self.graph_papers())
@@ -2545,29 +2544,6 @@ class PaperEditGUI:
 
     def add_new_author(self, new_author):
         self.authors_model.append((new_author.id, new_author.name))
-
-
-class PreferencesGUI:
-    def __init__(self):
-        self.ui = gtk.Builder()
-        self.ui.add_from_file(RUN_FROM_DIR + 'preferences_gui.xml')
-        self.edit_dialog = self.ui.get_object('preferences_dialog')
-        self.edit_dialog.connect("delete-event", self.edit_dialog.destroy)
-        self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy())
-        self.ui.get_object('button_save').connect("clicked", lambda x: self.save())
-        self.edit_dialog.show()
-
-    def save(self):
-        self.paper.title = self.ui.get_object('entry_title').get_text()
-        self.paper.doi = self.ui.get_object('entry_doi').get_text()
-        text_buffer = self.ui.get_object('textview_abstract').get_buffer()
-        self.paper.abstract = text_buffer.get_text(text_buffer.get_start_iter(), text_buffer.get_end_iter())
-        self.paper.save()
-        self.edit_dialog.destroy()
-        main_gui.refresh_middle_pane_search()
-
-
-
 
 def init_db():
     import django.core.management.commands.syncdb
