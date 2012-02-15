@@ -82,12 +82,6 @@
           </object>
         </child>
         <child>
-          <object class="GtkAction" id="menuitem_preferences">
-            <property name="stock_id">gtk-preferences</property>
-            <property name="name">menuitem_preferences</property>
-          </object>
-        </child>
-        <child>
           <object class="GtkAction" id="menuitem4">
             <property name="name">menuitem4</property>
             <property name="label" translatable="yes">_View</property>
