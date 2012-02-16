@@ -1,48 +1,43 @@
 <?xml version="1.0"?>
 <interface>
+  <requires lib="gtk+" version="2.16"/>
   <object class="GtkUIManager" id="uimanager1">
     <child>
       <object class="GtkActionGroup" id="actiongroup1">
         <child>
-          <object class="GtkAction" id="menuitem1">
-            <property name="name">menuitem1</property>
+          <object class="GtkAction" id="menuitem_files">
+            <property name="name">menuitem_files</property>
             <property name="label" translatable="yes">_File</property>
           </object>
         </child>
         <child>
-          <object class="GtkAction" id="menuitem2">
-            <property name="name">menuitem2</property>
-            <property name="label" translatable="yes">Import</property>
+          <object class="GtkAction" id="menuitem_import_files">
+            <property name="name">menuitem_import_files</property>
+            <property name="label" translatable="yes">Import Files…</property>
           </object>
-        </child>
+        </child>        
+        <child>
+          <object class="GtkAction" id="menuitem_import_directory">
+            <property name="name">menuitem_import_directory</property>
+            <property name="label" translatable="yes">Import Directory…</property>
+          </object>
+        </child>                
         <child>
           <object class="GtkAction" id="menuitem_import_url">
             <property name="name">menuitem_import_url</property>
-            <property name="label" translatable="yes">Citation URL...</property>
+            <property name="label" translatable="yes">Import URL…</property>
           </object>
         </child>
         <child>
           <object class="GtkAction" id="menuitem_import_doi">
             <property name="name">menuitem_import_doi</property>
-            <property name="label" translatable="yes">DOI...</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_import_file">
-            <property name="name">menuitem_import_file</property>
-            <property name="label" translatable="yes">Files...</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_import_directory">
-            <property name="name">menuitem_import_directory</property>
-            <property name="label" translatable="yes">Directory...</property>
+            <property name="label" translatable="yes">Import DOI…</property>
           </object>
         </child>
         <child>
           <object class="GtkAction" id="menuitem_import_bibtex">
             <property name="name">menuitem_import_bibtex</property>
-            <property name="label" translatable="yes">BibTex...</property>
+            <property name="label" translatable="yes">Import BibTex…</property>
           </object>
         </child>
         <child>
@@ -52,37 +47,37 @@
           </object>
         </child>
         <child>
-          <object class="GtkAction" id="menuitem3">
-            <property name="name">menuitem3</property>
+          <object class="GtkAction" id="menuitem_edit">
+            <property name="name">menuitem_edit</property>
             <property name="label" translatable="yes">_Edit</property>
           </object>
         </child>
         <child>
-          <object class="GtkAction" id="imagemenuitem1">
+          <object class="GtkAction" id="menuitem_cut">
             <property name="stock_id">gtk-cut</property>
-            <property name="name">imagemenuitem1</property>
+            <property name="name">menuitem_cut</property>
           </object>
         </child>
         <child>
-          <object class="GtkAction" id="imagemenuitem2">
+          <object class="GtkAction" id="menuitem_copy">
             <property name="stock_id">gtk-copy</property>
-            <property name="name">imagemenuitem2</property>
+            <property name="name">menuitem_copy</property>
           </object>
         </child>
         <child>
-          <object class="GtkAction" id="imagemenuitem3">
+          <object class="GtkAction" id="menuitem_paste">
             <property name="stock_id">gtk-paste</property>
-            <property name="name">imagemenuitem3</property>
+            <property name="name">menuitem_paste</property>
           </object>
         </child>
         <child>
-          <object class="GtkAction" id="imagemenuitem4">
+          <object class="GtkAction" id="menuitem_delete">
             <property name="stock_id">gtk-delete</property>
-            <property name="name">imagemenuitem4</property>
+            <property name="name">menuitem_delete</property>
           </object>
         </child>
         <child>
-          <object class="GtkAction" id="menuitem4">
+          <object class="GtkAction" id="menuitem_view">
             <property name="name">menuitem4</property>
             <property name="label" translatable="yes">_View</property>
           </object>
@@ -100,16 +95,9 @@
           </object>
         </child>
         <child>
-          <object class="GtkAction" id="menuitem8">
-            <property name="name">menuitem8</property>
+          <object class="GtkAction" id="menuitem_help">
+            <property name="name">menuitem_help</property>
             <property name="label" translatable="yes">_Help</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_check_updates">
-            <property name="stock_id">gtk-network</property>
-            <property name="name">menuitem_check_updates</property>
-            <property name="label" translatable="yes">Check for updates...</property>
           </object>
         </child>
         <child>
@@ -122,31 +110,27 @@
     </child>
     <ui>
       <menubar name="menubar1">
-        <menu action="menuitem1">
-          <menu action="menuitem2">
-            <menuitem action="menuitem_import_url"/>
-            <menuitem action="menuitem_import_doi"/>
-            <menuitem action="menuitem_import_file"/>
-            <menuitem action="menuitem_import_directory"/>
-            <menuitem action="menuitem_import_bibtex"/>
-          </menu>
+          <menu action="menuitem_files">
+          <menuitem action="menuitem_import_files"/>
+          <menuitem action="menuitem_import_directory"/>          
+          <menuitem action="menuitem_import_url"/>
+          <menuitem action="menuitem_import_doi"/>
+          <menuitem action="menuitem_import_bibtex"/>
           <separator/>
           <menuitem action="menuitem_quit"/>
         </menu>
-        <menu action="menuitem3">
-          <menuitem action="imagemenuitem1"/>
-          <menuitem action="imagemenuitem2"/>
-          <menuitem action="imagemenuitem3"/>
-          <menuitem action="imagemenuitem4"/>
-          <separator/>
-          <menuitem action="menuitem_preferences"/>
+        <menu action="menuitem_edit">
+          <menuitem action="menuitem_cut"/>
+          <menuitem action="menuitem_copy"/>
+          <menuitem action="menuitem_paste"/>
+          <menuitem action="menuitem_delete"/>
+
         </menu>
-        <menu action="menuitem4">
+        <menu action="menuitem_view">
           <menuitem action="menuitem_author_graph"/>
           <menuitem action="menuitem_paper_graph"/>
         </menu>
-        <menu action="menuitem8">
-          <menuitem action="menuitem_check_updates"/>
+        <menu action="menuitem_help">
           <menuitem action="menuitem_about"/>
         </menu>
       </menubar>

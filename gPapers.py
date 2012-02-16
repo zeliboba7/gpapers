@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 #    gPapers
 #    Copyright (C) 2007 Derek Anderson
@@ -18,6 +19,7 @@
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import commands, dircache, getopt, math, os, re, string, sys, thread, threading, time, traceback, urllib
+import mimetypes
 from datetime import date, datetime, timedelta
 from time import strptime
 
@@ -160,10 +162,6 @@ def sort_model_by_column(column, model, model_column_number):
     column.set_sort_indicator(True)
     column.set_sort_order(sort_order)
 
-def fetch_citation_via_url(url):
-    log_info('trying to fetch: %s' % url)
-    t = thread.start_new_thread(importer.import_citation, (url, None, main_gui.refresh_middle_pane_search))
-
 def fetch_citation_via_middle_top_pane_row(row):
     t = thread.start_new_thread(import_citation_via_middle_top_pane_row, (row,))
 
@@ -174,14 +172,6 @@ def fetch_citations_via_urls(urls):
 def fetch_citations_via_references(references):
     log_info('trying to fetch: %s' % str(references))
     t = thread.start_new_thread(import_citations_via_references, (references,))
-
-def fetch_citations_via_bibtexs(bibtexs):
-    log_info('trying to fetch bibtexs: %s' % str(bibtexs))
-    t = thread.start_new_thread(import_citations_via_bibtexs, (bibtexs,))
-
-def fetch_documents_via_filenames(filenames):
-    log_info('trying to fetch files: %s' % str(filenames))
-    t = thread.start_new_thread(import_documents_via_filenames, (filenames,))
 
 def import_citations(urls):
     for url in urls:
@@ -201,12 +191,40 @@ def import_citations_via_references(references):
     main_gui.refresh_middle_pane_search()
 
 def import_documents_via_filenames(filenames):
-    for filename in filenames:
+    '''
+    Adds existing files or directories to the database and copies the documents
+    to the MEDIA_ROOT/papers directory.
+    ``filenames`` is a sequence of filenames.
+    '''
+
+    log_info('Starting filename import for %d documents' % len(filenames))
+
+    def get_all_files(basedir, filenames):
+        '''
+        Returns a flat list with all pdf files in the file/directory list
+        '''
+        results = []
+        for filename in filenames:
+            filename = os.path.join(basedir, filename)
+            if os.path.isdir(filename):
+                results.extend(get_all_files(filename, os.listdir(filename)))
+            elif mimetypes.guess_type(filename)[0] == 'application/pdf':
+                #TODO: Also allow other file types like ps.gz
+                results.append(filename)
+        return results
+
+    all_files = get_all_files('', filenames)
+    # TODO: Show an error message if no file is found?
+
+    for filename in all_files:
         data = open(filename, 'r').read()
         import_document(filename, data)
+
     main_gui.refresh_middle_pane_search()
 
 def import_citations_via_bibtexs(bibtexs):
+
+    log_info('Starting BibTex import')
 
     a_bibtex = []
 
@@ -323,8 +341,15 @@ class MainGUI:
     current_middle_top_pane_refresh_thread_ident = None
     active_threads = {}
 
-    def import_url(self, o):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_OK_CANCEL, flags=gtk.DIALOG_MODAL)
+    def import_url_dialog(self, o):
+        '''
+        Opens a dialog for entering an URL. For importing this URL,
+        ``import_citation`` is called in a new thread.
+        '''
+        dialog = gtk.MessageDialog(parent=self.main_window,
+                                   type=gtk.MESSAGE_QUESTION,
+                                   buttons=gtk.BUTTONS_OK_CANCEL,
+                                   flags=gtk.DIALOG_MODAL)
         #dialog.connect('response', lambda x,y: dialog.destroy())
         dialog.set_markup('<b>Import URL...</b>\n\nEnter the URL you would like to import:')
         entry = gtk.Entry()
@@ -334,11 +359,22 @@ class MainGUI:
         dialog.show_all()
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
-            fetch_citation_via_url(entry.get_text())
+            url = entry.get_text()
+            threading.Thread(target=importer.import_citation,
+                             args=(url, None,
+                                   main_gui.refresh_middle_pane_search)).start()
         dialog.destroy()
 
-    def import_doi(self, o):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_OK_CANCEL, flags=gtk.DIALOG_MODAL)
+    def import_doi_dialog(self, o):
+        '''
+        Opens a dialog for entering a DOI. For importing this document from the
+        http://dx.doi.org/... URL, ``import_citation`` is called in a new
+        thread.
+        '''
+        dialog = gtk.MessageDialog(parent=self.main_window,
+                                   type=gtk.MESSAGE_QUESTION,
+                                   buttons=gtk.BUTTONS_OK_CANCEL,
+                                   flags=gtk.DIALOG_MODAL)
         #dialog.connect('response', lambda x,y: dialog.destroy())
         dialog.set_markup('<b>Import via DOI...</b>\n\nEnter the DOI name (e.g., 10.1000/182) you would like to import:')
         entry = gtk.Entry()
@@ -348,45 +384,64 @@ class MainGUI:
         dialog.show_all()
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
-            fetch_citation_via_url('http://dx.doi.org/' + entry.get_text().strip())
+            url = 'http://dx.doi.org/' + entry.get_text().strip()
+            threading.Thread(target=importer.import_citation,
+                             args=(url, None,
+                                   main_gui.refresh_middle_pane_search)).start()
         dialog.destroy()
 
-    def import_file(self, o):
-        dialog = gtk.FileChooserDialog(title='Select a PDF to import...', parent=None, action=gtk.FILE_CHOOSER_ACTION_OPEN, buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_OK), backend=None)
-        #dialog.connect('response', lambda x,y: dialog.destroy())
+    def import_file_dialog(self, o):
+        '''
+        Opens a dialog for chosing one or several files. If any files are 
+        chosen, ``import_documents_via_filenames`` is called in a new thread.
+        '''
+        dialog = gtk.FileChooserDialog(title='Select one or more files import…',
+                                       parent=self.main_window,
+                                       action=gtk.FILE_CHOOSER_ACTION_OPEN,
+                                       buttons=(gtk.STOCK_CANCEL,
+                                                gtk.RESPONSE_CANCEL,
+                                                gtk.STOCK_OPEN,
+                                                gtk.RESPONSE_OK))
         dialog.set_default_response(gtk.RESPONSE_OK)
         dialog.set_select_multiple(True)
         dialog.show_all()
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
-            fetch_documents_via_filenames(dialog.get_filenames())
+            threading.Thread(target=import_documents_via_filenames,
+                             args=(dialog.get_filenames(),)).start()
         dialog.destroy()
 
-    def import_directory(self, o):
-        dialog = gtk.FileChooserDialog(title='Select a directory to import...', parent=None, action=gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER, buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_OK), backend=None)
-        #dialog.connect('response', lambda x,y: dialog.destroy())
+    def import_directory_dialog(self, o):
+        '''
+        Opens a dialog for chosing a directory. If a directory is chosen,
+        ``import_documents_via_filenames`` is called in a new thread.
+        '''
+        dialog = gtk.FileChooserDialog(title='Select a directory to import…',
+                                       parent=self.main_window,
+                                       action=gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
+                                       buttons=(gtk.STOCK_CANCEL,
+                                                gtk.RESPONSE_CANCEL,
+                                                gtk.STOCK_OPEN,
+                                                gtk.RESPONSE_OK))
         dialog.set_default_response(gtk.RESPONSE_OK)
         dialog.set_select_multiple(True)
         dialog.show_all()
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
-            dirs = set([ os.path.join(dialog.get_current_folder(), x) for x in dialog.get_filenames() ])
-            pdf_filenames = set()
-            while dirs:
-                dir = dirs.pop()
-                if os.path.isdir(dir):
-                    for filename in os.listdir(dir):
-                        if filename == '.Trash': continue
-                        filename = os.path.join(dir, filename)
-                        if os.path.isdir(filename) and not filename.startswith(settings.MEDIA_ROOT):
-                            dirs.add(filename)
-                        elif filename.lower().endswith('.pdf'):
-                            pdf_filenames.add(filename)
-            fetch_documents_via_filenames(pdf_filenames)
+            threading.Thread(target=import_documents_via_filenames,
+                             args=(dialog.get_filenames(),)).start()
         dialog.destroy()
 
-    def import_bibtex(self, o):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_OK_CANCEL, flags=gtk.DIALOG_MODAL)
+    def import_bibtex_dialog(self, o):
+        '''
+        Opens a dialog for entering/pasting BibTex information. For importing
+        the information, ``import_documents_via_bibtexs`` is called in a new
+        thread.
+        '''
+        dialog = gtk.MessageDialog(parent=self.main_window,
+                                   type=gtk.MESSAGE_QUESTION,
+                                   buttons=gtk.BUTTONS_OK_CANCEL,
+                                   flags=gtk.DIALOG_MODAL)
         #dialog.connect('response', lambda x,y: dialog.destroy())
         dialog.set_markup('<b>Import BibTex...</b>\n\nEnter the BibTex entry (or entries) you would like to import:')
         entry = gtk.TextView()
@@ -399,15 +454,18 @@ class MainGUI:
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
             text_buffer = entry.get_buffer()
-            fetch_citations_via_bibtexs(text_buffer.get_text(text_buffer.get_start_iter(), text_buffer.get_end_iter()))
+            bibtex = text_buffer.get_text(text_buffer.get_start_iter(),
+                                          text_buffer.get_end_iter())
+            threading.Thread(target=import_citations_via_bibtexs,
+                             args=(bibtex,)).start()
         dialog.destroy()
 
     def __init__(self):
         gnome.init(PROGRAM, VERSION)
         self.ui = gtk.Builder()
         self.ui.add_from_file(RUN_FROM_DIR + 'ui.xml')
-        main_window = self.ui.get_object('main_window')
-        main_window.connect("delete-event", lambda x, y: sys.exit(0))
+        self.main_window = self.ui.get_object('main_window')
+        self.main_window.connect("delete-event", lambda x, y: sys.exit(0))
         self.init_menu()
         self.init_search_box()
         self.init_left_pane()
@@ -421,7 +479,7 @@ class MainGUI:
         self.pubmed_search = pubmed.PubMedSearch()
         self.google_scholar_search = google_scholar.GoogleScholarSearch()
         self.jstor_search = jstor.JSTORSearch()
-        main_window.show()
+        self.main_window.show()
 
     def init_busy_notifier(self):
         busy_notifier = self.ui.get_object('busy_notifier')
@@ -465,15 +523,14 @@ class MainGUI:
 
     def init_menu(self):
         self.ui.get_object('menuitem_quit').connect('activate', lambda x: sys.exit(0))
-        self.ui.get_object('menuitem_import_url').connect('activate', self.import_url)
-        self.ui.get_object('menuitem_import_doi').connect('activate', self.import_doi)
-        self.ui.get_object('menuitem_import_file').connect('activate', self.import_file)
-        self.ui.get_object('menuitem_import_directory').connect('activate', self.import_directory)
-        self.ui.get_object('menuitem_import_bibtex').connect('activate', self.import_bibtex)
+        self.ui.get_object('menuitem_import_url').connect('activate', self.import_url_dialog)
+        self.ui.get_object('menuitem_import_doi').connect('activate', self.import_doi_dialog)
+        self.ui.get_object('menuitem_import_files').connect('activate', self.import_file_dialog)
+        self.ui.get_object('menuitem_import_directory').connect('activate', self.import_directory_dialog)
+        self.ui.get_object('menuitem_import_bibtex').connect('activate', self.import_bibtex_dialog)
         self.ui.get_object('menuitem_author_graph').connect('activate', lambda x: self.graph_authors())
         self.ui.get_object('menuitem_paper_graph').connect('activate', lambda x: self.graph_papers())
         self.ui.get_object('menuitem_about').connect('activate', self.show_about_dialog)
-        self.ui.get_object('menuitem_check_updates').connect('activate', lambda x: self.check_for_updates())
 
     def init_search_box(self):
         thread.start_new_thread(self.watch_middle_pane_search, ())
@@ -1673,7 +1730,7 @@ class MainGUI:
         dialog.destroy()
         if response == gtk.RESPONSE_YES:
             for paper in papers:
-                log_info('deleting paper: %s', str(paper))
+                log_info('deleting paper: %s' % str(paper))
                 paper.delete()
             self.refresh_middle_pane_search()
 
