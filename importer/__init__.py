@@ -250,6 +250,9 @@ def update_paper_from_bibtex_html(paper, html):
 #TODO: Refactor import_pdf into a new function 
 
 def import_citation(url, paper=None, callback=None):
+
+    log_info('Importing URL: %s' % url)
+
     active_threads[ thread.get_ident() ] = 'importing: ' + url
     try:
         response = urllib.urlopen(url)
