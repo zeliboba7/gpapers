@@ -21,10 +21,18 @@ class GoogleScholarSearch(object):
                            '/scholar_setprefs?num=100&scis=yes&scisf=4&submit=Save+Preferences')
         log_debug('Google Scholar: Returned status: %d' % params['status'])
 
+        self.name = 'Google Scholar'
+        self.label = 'google_scholar'
+        self.icon = 'favicon_google.ico'
+
         # Remember previous search results so that no new search is necessary.
         # Useful especially if switching between libraries/searches in the left
         # pane
         self.search_cache = {}
+
+    def clear_cache(self, text):
+        if text in self.search_cache:
+            del self.search_cache[text]
 
     def unique_key(self):
         return 'import_url'

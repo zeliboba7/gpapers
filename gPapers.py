@@ -462,6 +462,9 @@ class MainGUI:
 
     def __init__(self):
         gnome.init(PROGRAM, VERSION)
+        self.provider = {1 : pubmed.PubMedSearch(),
+                         2 : google_scholar.GoogleScholarSearch(),
+                         3 : jstor.JSTORSearch()}
         self.ui = gtk.Builder()
         self.ui.add_from_file(RUN_FROM_DIR + 'ui.xml')
         self.main_window = self.ui.get_object('main_window')
@@ -476,9 +479,6 @@ class MainGUI:
         self.init_bookmark_pane()
         self.init_pdf_preview_pane()
         self.refresh_left_pane()
-        self.pubmed_search = pubmed.PubMedSearch()
-        self.google_scholar_search = google_scholar.GoogleScholarSearch()
-        self.jstor_search = jstor.JSTORSearch()
         self.main_window.show()
 
     def init_busy_notifier(self):
@@ -579,7 +579,7 @@ class MainGUI:
         playlist, created = Playlist.objects.get_or_create(
             title='search: <i>%s</i>' % self.ui.get_object('middle_pane_search').get_text(),
             search_text=self.ui.get_object('middle_pane_search').get_text(),
-            parent=str(rows[0][0])
+            parent=self.provider[rows[0][0]]
         )
         if created: playlist.save()
         self.refresh_left_pane()
@@ -596,6 +596,13 @@ class MainGUI:
         self.refresh_left_pane()
 
     def refresh_middle_pane_search(self):
+        selection = self.ui.get_object('left_pane').get_selection()
+        _, rows = selection.get_selected_rows()
+        if rows[0][0] > 0:
+            # For the external search providers: clear cache
+            text = self.ui.get_object('middle_pane_search').get_text()
+            self.provider[rows[0][0]].clear_cache(text)
+
         self.last_middle_pane_search_string = None
 
     #FIXME: Use signal instead
@@ -896,32 +903,15 @@ class MainGUI:
         self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>never read</i>', gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'applications-development.png')), -5, False))
         self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>highest rated</i>', gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'emblem-favorite.png')), -4, False))
 
-        self.left_pane_model.append(None, ('PubMed',
-                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_pubmed.ico')), -1, False))
-        for playlist in Playlist.objects.filter(parent='1'):
-            if playlist.search_text:
-                icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
-            else:
-                icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
-            self.left_pane_model.append(self.left_pane_model.get_iter((1),), (playlist.title, icon, playlist.id, True))
-
-        self.left_pane_model.append(None, ('Google Scholar',
-                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_google.ico')), -1, False))
-        for playlist in Playlist.objects.filter(parent='2'):
-            if playlist.search_text:
-                icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
-            else:
-                icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
-            self.left_pane_model.append(self.left_pane_model.get_iter((2),), (playlist.title, icon, playlist.id, True))
-
-        self.left_pane_model.append(None, ('JSTOR',
-                                     gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'favicon_jstor.ico')), -1, False))
-        for playlist in Playlist.objects.filter(parent='3'):
-            if playlist.search_text:
-                icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
-            else:
-                icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
-            self.left_pane_model.append(self.left_pane_model.get_iter((3),), (playlist.title, icon, playlist.id, True))
+        for _, provider in self.provider.iteritems():
+            self.left_pane_model.append(None, (provider.name,
+                             gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', provider.icon)), -1, False))
+            for playlist in Playlist.objects.filter(parent=provider.label):
+                if playlist.search_text:
+                    icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
+                else:
+                    icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
+                self.left_pane_model.append(self.left_pane_model.get_iter((1),), (playlist.title, icon, playlist.id, True))
 
         left_pane.expand_all()
         self.ui.get_object('left_pane').get_selection().select_path((0,))
@@ -978,12 +968,8 @@ class MainGUI:
         log_debug('rows[0][0]: %d' % rows[0][0])
         if rows[0][0] == 0:
             self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(self.refresh_middle_pane_from_my_library, (True,))
-        elif rows[0][0] == 1:
-            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.pubmed_search), ())
-        elif rows[0][0] == 2:
-            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.google_scholar_search), ())
-        elif rows[0][0] == 3:
-            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.jstor_search), ())
+        else:
+            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.provider[rows[0][0]]), ())
 
         self.select_middle_top_pane_item(self.ui.get_object('middle_top_pane').get_selection())
 
