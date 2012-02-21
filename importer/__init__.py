@@ -21,13 +21,13 @@ from time import strptime
 from htmlentitydefs import name2codepoint as n2cp
 import urllib, urlparse
 
-import pygtk
-pygtk.require("2.0")
-import gobject
-import gtk
+import gi
+pyGtk.require("2.0")
+from gi.repository import GObject
+from gi.repository import Gtk
 import gnome
 import gnome.ui
-import pango
+from gi.repository import Pango
 
 from pyPdf import PdfFileReader
 
@@ -96,16 +96,16 @@ def _substitute_entity(match):
             return match.group()
 
 def _should_we_reimport_paper(paper):
-    gtk.gdk.threads_enter()
-    dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_OK_CANCEL, flags=gtk.DIALOG_MODAL)
+    Gdk.threads_enter()
+    dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.OK_CANCEL, flags=Gtk.DialogFlags.MODAL)
     #dialog.connect('response', lambda x,y: dialog.destroy())
     dialog.set_markup('This paper already exists in your local library:\n\n<i>"%s"</i>\n(imported on %s)\n\nShould we continue the import, updating/overwriting the previous entry?' % (paper.title, str(paper.created.date())))
-    dialog.set_default_response(gtk.RESPONSE_OK)
+    dialog.set_default_response(Gtk.ResponseType.OK)
     dialog.show_all()
     response = dialog.run()
     dialog.destroy()
-    gtk.gdk.threads_leave()
-    return response == gtk.RESPONSE_OK
+    Gdk.threads_leave()
+    return response == Gtk.ResponseType.OK
 
 def get_or_create_paper_via(id=None, doi=None, pubmed_id=None,
                             import_url=None, title=None, full_text_md5=None,
@@ -309,19 +309,19 @@ def import_citation(url, paper=None, callback=None):
 
     except:
         traceback.print_exc()
-        gtk.gdk.threads_enter()
-        error = gtk.MessageDialog(type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL)
+        Gdk.threads_enter()
+        error = Gtk.MessageDialog(type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, flags=Gtk.DialogFlags.MODAL)
         error.connect('response', lambda x, y: error.destroy())
         error.set_markup('<b>Unknown Error</b>\n\nUnable to download this resource.')
         error.run()
-        gtk.gdk.threads_leave()
+        Gdk.threads_leave()
 
-    gtk.gdk.threads_enter()
-    error = gtk.MessageDialog(type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL)
+    Gdk.threads_enter()
+    error = Gtk.MessageDialog(type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, flags=Gtk.DialogFlags.MODAL)
     error.connect('response', lambda x, y: error.destroy())
     error.set_markup('<b>No Paper Found</b>\n\nThe given URL does not appear to contain or link to any PDF files. (perhaps you have it buy it?) Try downloading the file and adding it using "File &gt;&gt; Import..."\n\n%s' % pango_escape(url))
     error.run()
-    gtk.gdk.threads_leave()
+    Gdk.threads_leave()
     if active_threads.has_key(thread.get_ident()):
         del active_threads[ thread.get_ident() ]
 
