@@ -17,9 +17,16 @@ class PubMedSearch(object):
 
     def __init__(self):
         self.search_cache = {}
+        self.name = 'PubMed'
+        self.label = 'pubmed'
+        self.icon = 'favicon_pubmed.ico'
 
     def unique_key(self):
         return 'pubmed_id'
+
+    def clear_cache(self, text):
+        if text in self.search_cache:
+            del self.search_cache[text]
 
     def search(self, search_text):
         '''
