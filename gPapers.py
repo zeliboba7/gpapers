@@ -47,23 +47,23 @@ DATE_FORMAT = '%Y-%m-%d'
 
 # GUI imports
 try:
-    import pygtk
-    pygtk.require("2.0")
-    import gobject
-    import gtk
+    import gi
+    pyGtk.require("2.0")
+    from gi.repository import GObject
+    from gi.repository import Gtk
     import gnome
     import gnome.ui
-    import pango
-    gobject.threads_init()
-    gtk.gdk.threads_init()
+    from gi.repository import Pango
+    GObject.threads_init()
+    Gdk.threads_init()
 except:
     traceback.print_exc()
     log_error('Could not import required GTK libraries.')
     sys.exit()
 
-LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION = ('add_to_playlist', gtk.TARGET_SAME_APP, 0)
-MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION = ('reorder_playlist', gtk.TARGET_SAME_WIDGET, 1)
-PDF_PREVIEW_MOVE_NOTE_DND_ACTION = ('move_note', gtk.TARGET_SAME_WIDGET, 2)
+LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION = ('add_to_playlist', Gtk.TargetFlags.SAME_APP, 0)
+MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION = ('reorder_playlist', Gtk.TargetFlags.SAME_WIDGET, 1)
+PDF_PREVIEW_MOVE_NOTE_DND_ACTION = ('move_note', Gtk.TargetFlags.SAME_WIDGET, 2)
 
 import settings
 import desktop, openanything
@@ -80,9 +80,9 @@ from importer import pango_escape
 from importer import html_strip, pango_escape, get_md5_hexdigest_from_data
 from importer import pubmed, google_scholar, jstor
 
-NOTE_ICON = gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'note.png'))
-BOOKMARK_ICON = gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'bookmark.png'))
-GRAPH_ICON = gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'drawing.png'))
+NOTE_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'note.png'))
+BOOKMARK_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'bookmark.png'))
+GRAPH_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'drawing.png'))
 
 def humanize_count(x, s, p, places=1):
     output = []
@@ -112,11 +112,11 @@ def truncate_long_str(s, max_length=96):
 
 def set_model_from_list(cb, items):
     """Setup a ComboBox or ComboBoxEntry based on a list of (int,str)s."""
-    model = gtk.ListStore(int, str)
+    model = Gtk.ListStore(int, str)
     for i in items:
         model.append(i)
     cb.set_model(model)
-    cell = gtk.CellRendererText()
+    cell = Gtk.CellRendererText()
     cb.pack_start(cell, True)
     cb.add_attribute(cell, 'text', 1)
 
@@ -133,12 +133,12 @@ def make_all_columns_resizeable_clickable_ellipsize(columns):
         #column.connect('clicked', self.sortRows)
         for renderer in column.get_cell_renderers():
             if renderer.__class__.__name__ == 'CellRendererText':
-                renderer.set_property('ellipsize', pango.ELLIPSIZE_END)
+                renderer.set_property('ellipsize', Pango.EllipsizeMode.END)
 
 treeview_sort_states = {}
 def sort_model_by_column(column, model, model_column_number):
     global treeview_sort_states
-    sort_order = treeview_sort_states.get(str(model) + '-sort_order', gtk.SORT_ASCENDING)
+    sort_order = treeview_sort_states.get(str(model) + '-sort_order', Gtk.SortType.ASCENDING)
     last_sort_column = treeview_sort_states.get(str(model) + '-last_sort_column', None)
 
     if last_sort_column is not None:
@@ -146,17 +146,17 @@ def sort_model_by_column(column, model, model_column_number):
 
     # Ascending or descending?
     if last_sort_column == column:
-        if sort_order == gtk.SORT_ASCENDING:
-            sort_order = gtk.SORT_DESCENDING
+        if sort_order == Gtk.SortType.ASCENDING:
+            sort_order = Gtk.SortType.DESCENDING
         else:
-            sort_order = gtk.SORT_ASCENDING
+            sort_order = Gtk.SortType.ASCENDING
     else:
-        sort_order = gtk.SORT_ASCENDING
+        sort_order = Gtk.SortType.ASCENDING
         treeview_sort_states[str(model) + '-last_sort_column'] = column
     treeview_sort_states[str(model) + '-sort_order'] = sort_order
 
     rows = [tuple(r) + (i,) for i, r in enumerate(model)]
-    rows.sort(key=lambda x:x[model_column_number], reverse=sort_order == gtk.SORT_DESCENDING)
+    rows.sort(key=lambda x:x[model_column_number], reverse=sort_order == Gtk.SortType.DESCENDING)
     model.reorder([r[-1] for r in rows])
 
     column.set_sort_indicator(True)
@@ -304,12 +304,12 @@ def import_document(filename, data=None):
             paper.delete()
 
 def show_html_error_dialog(code):
-    gtk.gdk.threads_enter()
-    error = gtk.MessageDialog(type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK, flags=gtk.DIALOG_MODAL)
+    Gdk.threads_enter()
+    error = Gtk.MessageDialog(type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, flags=Gtk.DialogFlags.MODAL)
     error.connect('response', lambda x, y: error.destroy())
     error.set_markup('<b>Unable to Search External Repository</b>\n\nHTTP Error code: %d' % code)
     error.run()
-    gtk.gdk.threads_leave()
+    Gdk.threads_leave()
 
 def row_from_dictionary(info, provider=None):
     assert info is not None
@@ -346,19 +346,19 @@ class MainGUI:
         Opens a dialog for entering an URL. For importing this URL,
         ``import_citation`` is called in a new thread.
         '''
-        dialog = gtk.MessageDialog(parent=self.main_window,
-                                   type=gtk.MESSAGE_QUESTION,
-                                   buttons=gtk.BUTTONS_OK_CANCEL,
-                                   flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(parent=self.main_window,
+                                   type=Gtk.MessageType.QUESTION,
+                                   buttons=Gtk.ButtonsType.OK_CANCEL,
+                                   flags=Gtk.DialogFlags.MODAL)
         #dialog.connect('response', lambda x,y: dialog.destroy())
         dialog.set_markup('<b>Import URL...</b>\n\nEnter the URL you would like to import:')
-        entry = gtk.Entry()
+        entry = Gtk.Entry()
         entry.set_activates_default(True)
-        dialog.vbox.pack_start(entry)
-        dialog.set_default_response(gtk.RESPONSE_OK)
+        dialog.vbox.pack_start(entry, True, True, 0)
+        dialog.set_default_response(Gtk.ResponseType.OK)
         dialog.show_all()
         response = dialog.run()
-        if response == gtk.RESPONSE_OK:
+        if response == Gtk.ResponseType.OK:
             url = entry.get_text()
             threading.Thread(target=importer.import_citation,
                              args=(url, None,
@@ -371,19 +371,19 @@ class MainGUI:
         http://dx.doi.org/... URL, ``import_citation`` is called in a new
         thread.
         '''
-        dialog = gtk.MessageDialog(parent=self.main_window,
-                                   type=gtk.MESSAGE_QUESTION,
-                                   buttons=gtk.BUTTONS_OK_CANCEL,
-                                   flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(parent=self.main_window,
+                                   type=Gtk.MessageType.QUESTION,
+                                   buttons=Gtk.ButtonsType.OK_CANCEL,
+                                   flags=Gtk.DialogFlags.MODAL)
         #dialog.connect('response', lambda x,y: dialog.destroy())
         dialog.set_markup('<b>Import via DOI...</b>\n\nEnter the DOI name (e.g., 10.1000/182) you would like to import:')
-        entry = gtk.Entry()
+        entry = Gtk.Entry()
         entry.set_activates_default(True)
-        dialog.vbox.pack_start(entry)
-        dialog.set_default_response(gtk.RESPONSE_OK)
+        dialog.vbox.pack_start(entry, True, True, 0)
+        dialog.set_default_response(Gtk.ResponseType.OK)
         dialog.show_all()
         response = dialog.run()
-        if response == gtk.RESPONSE_OK:
+        if response == Gtk.ResponseType.OK:
             url = 'http://dx.doi.org/' + entry.get_text().strip()
             threading.Thread(target=importer.import_citation,
                              args=(url, None,
@@ -395,18 +395,18 @@ class MainGUI:
         Opens a dialog for chosing one or several files. If any files are 
         chosen, ``import_documents_via_filenames`` is called in a new thread.
         '''
-        dialog = gtk.FileChooserDialog(title='Select one or more files import…',
+        dialog = Gtk.FileChooserDialog(title='Select one or more files import…',
                                        parent=self.main_window,
-                                       action=gtk.FILE_CHOOSER_ACTION_OPEN,
-                                       buttons=(gtk.STOCK_CANCEL,
-                                                gtk.RESPONSE_CANCEL,
-                                                gtk.STOCK_OPEN,
-                                                gtk.RESPONSE_OK))
-        dialog.set_default_response(gtk.RESPONSE_OK)
+                                       action=Gtk.FileChooserAction.OPEN,
+                                       buttons=(Gtk.STOCK_CANCEL,
+                                                Gtk.ResponseType.CANCEL,
+                                                Gtk.STOCK_OPEN,
+                                                Gtk.ResponseType.OK))
+        dialog.set_default_response(Gtk.ResponseType.OK)
         dialog.set_select_multiple(True)
         dialog.show_all()
         response = dialog.run()
-        if response == gtk.RESPONSE_OK:
+        if response == Gtk.ResponseType.OK:
             threading.Thread(target=import_documents_via_filenames,
                              args=(dialog.get_filenames(),)).start()
         dialog.destroy()
@@ -416,18 +416,18 @@ class MainGUI:
         Opens a dialog for chosing a directory. If a directory is chosen,
         ``import_documents_via_filenames`` is called in a new thread.
         '''
-        dialog = gtk.FileChooserDialog(title='Select a directory to import…',
+        dialog = Gtk.FileChooserDialog(title='Select a directory to import…',
                                        parent=self.main_window,
-                                       action=gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
-                                       buttons=(gtk.STOCK_CANCEL,
-                                                gtk.RESPONSE_CANCEL,
-                                                gtk.STOCK_OPEN,
-                                                gtk.RESPONSE_OK))
-        dialog.set_default_response(gtk.RESPONSE_OK)
+                                       action=Gtk.FileChooserAction.SELECT_FOLDER,
+                                       buttons=(Gtk.STOCK_CANCEL,
+                                                Gtk.ResponseType.CANCEL,
+                                                Gtk.STOCK_OPEN,
+                                                Gtk.ResponseType.OK))
+        dialog.set_default_response(Gtk.ResponseType.OK)
         dialog.set_select_multiple(True)
         dialog.show_all()
         response = dialog.run()
-        if response == gtk.RESPONSE_OK:
+        if response == Gtk.ResponseType.OK:
             threading.Thread(target=import_documents_via_filenames,
                              args=(dialog.get_filenames(),)).start()
         dialog.destroy()
@@ -438,21 +438,21 @@ class MainGUI:
         the information, ``import_documents_via_bibtexs`` is called in a new
         thread.
         '''
-        dialog = gtk.MessageDialog(parent=self.main_window,
-                                   type=gtk.MESSAGE_QUESTION,
-                                   buttons=gtk.BUTTONS_OK_CANCEL,
-                                   flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(parent=self.main_window,
+                                   type=Gtk.MessageType.QUESTION,
+                                   buttons=Gtk.ButtonsType.OK_CANCEL,
+                                   flags=Gtk.DialogFlags.MODAL)
         #dialog.connect('response', lambda x,y: dialog.destroy())
         dialog.set_markup('<b>Import BibTex...</b>\n\nEnter the BibTex entry (or entries) you would like to import:')
-        entry = gtk.TextView()
-        scrolledwindow = gtk.ScrolledWindow()
+        entry = Gtk.TextView()
+        scrolledwindow = Gtk.ScrolledWindow()
         scrolledwindow.add(entry)
         scrolledwindow.set_property('height-request', 300)
-        dialog.vbox.pack_start(scrolledwindow)
-        dialog.set_default_response(gtk.RESPONSE_OK)
+        dialog.vbox.pack_start(scrolledwindow, True, True, 0)
+        dialog.set_default_response(Gtk.ResponseType.OK)
         dialog.show_all()
         response = dialog.run()
-        if response == gtk.RESPONSE_OK:
+        if response == Gtk.ResponseType.OK:
             text_buffer = entry.get_buffer()
             bibtex = text_buffer.get_text(text_buffer.get_start_iter(),
                                           text_buffer.get_end_iter())
@@ -465,7 +465,7 @@ class MainGUI:
         self.provider = {1 : pubmed.PubMedSearch(),
                          2 : google_scholar.GoogleScholarSearch(),
                          3 : jstor.JSTORSearch()}
-        self.ui = gtk.Builder()
+        self.ui = Gtk.Builder()
         self.ui.add_from_file(RUN_FROM_DIR + 'ui.xml')
         self.main_window = self.ui.get_object('main_window')
         self.main_window.connect("delete-event", lambda x, y: sys.exit(0))
@@ -488,12 +488,12 @@ class MainGUI:
 
         treeview_running_tasks = self.ui.get_object('treeview_running_tasks')
         # thread_id, text
-        self.treeview_running_tasks_model = gtk.ListStore(int, str)
+        self.treeview_running_tasks_model = Gtk.ListStore(int, str)
         treeview_running_tasks.set_model(self.treeview_running_tasks_model)
 
-        renderer = gtk.CellRendererText()
-        renderer.set_property("background", "#fff7e8") # gtk.gdk.color_parse("#fff7e8")
-        column = gtk.TreeViewColumn("Running Tasks...", renderer, text=1)
+        renderer = Gtk.CellRendererText()
+        renderer.set_property("background", "#fff7e8") # Gdk.color_parse("#fff7e8")
+        column = Gtk.TreeViewColumn("Running Tasks...", renderer, text=1)
         column.set_expand(True)
         treeview_running_tasks.append_column(column)
         make_all_columns_resizeable_clickable_ellipsize(treeview_running_tasks.get_columns())
@@ -539,7 +539,7 @@ class MainGUI:
         self.ui.get_object('save_smart_search').connect('clicked', lambda x: self.save_smart_search())
 
     def show_about_dialog(self, o):
-        about = gtk.AboutDialog()
+        about = Gtk.AboutDialog()
         about.set_name('gPapers')
         about.set_version(VERSION)
         about.set_copyright('Copyright (c) 2008 Derek Anderson')
@@ -556,13 +556,13 @@ class MainGUI:
             def run(self):
                 parent_self.active_threads[ thread.get_ident() ] = 'checking for updates...'
                 output = commands.getoutput('svn update')
-                gtk.gdk.threads_enter()
-                dialog = gtk.MessageDialog(type=gtk.MESSAGE_INFO, buttons=gtk.BUTTONS_OK)
+                Gdk.threads_enter()
+                dialog = Gtk.MessageDialog(type=Gtk.MessageType.INFO, buttons=Gtk.ButtonsType.OK)
                 dialog.connect('response', lambda x, y: dialog.destroy())
                 dialog.set_markup('<b>Output from SVN:</b>\n\n%s\n\n(restart for changes to take effect)' % (pango_escape(output)))
                 dialog.show_all()
                 response = dialog.run()
-                gtk.gdk.threads_leave()
+                Gdk.threads_leave()
                 if parent_self.active_threads.has_key(thread.get_ident()):
                     del parent_self.active_threads[ thread.get_ident() ]
         t = UpdateThread()
@@ -615,32 +615,32 @@ class MainGUI:
                 liststore, rows = selection.get_selected_rows()
                 selection.unselect_all()
                 if rows:
-                    gtk.gdk.threads_enter()
+                    Gdk.threads_enter()
                     selection.select_path((rows[0][0],))
-                    gtk.gdk.threads_leave()
+                    Gdk.threads_leave()
             time.sleep(1)
 
     def init_left_pane(self):
         left_pane = self.ui.get_object('left_pane')
         # name, icon, playlist_id, editable
-        self.left_pane_model = gtk.TreeStore(str, gtk.gdk.Pixbuf, int, bool)
+        self.left_pane_model = Gtk.TreeStore(str, GdkPixbuf.Pixbuf, int, bool)
         left_pane.set_model(self.left_pane_model)
 
-        column = gtk.TreeViewColumn()
+        column = Gtk.TreeViewColumn()
         left_pane.append_column(column)
-        renderer = gtk.CellRendererPixbuf()
-        column.pack_start(renderer, expand=False)
+        renderer = Gtk.CellRendererPixbuf()
+        column.pack_start(renderer, False, True, 0)
         column.add_attribute(renderer, 'pixbuf', 1)
-        renderer = gtk.CellRendererText()
+        renderer = Gtk.CellRendererText()
         renderer.connect('edited', self.handle_playlist_edited)
-        column.pack_start(renderer, expand=True)
+        column.pack_start(renderer, True, True, 0)
         column.add_attribute(renderer, 'markup', 0)
         column.add_attribute(renderer, 'editable', 3)
 
         left_pane.get_selection().connect('changed', self.select_left_pane_item)
         left_pane.connect('button-press-event', self.handle_left_pane_button_press_event)
 
-        left_pane.enable_model_drag_dest([LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION], gtk.gdk.ACTION_COPY)
+        left_pane.enable_model_drag_dest([LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION], Gdk.DragAction.COPY)
         left_pane.connect('drag-data-received', self.handle_left_pane_drag_data_received_event)
         left_pane.connect("drag-motion", self.handle_left_pane_drag_motion_event)
 
@@ -652,9 +652,9 @@ class MainGUI:
         pdf_preview.connect("button-press-event", self.handle_pdf_preview_button_press_event)
 
         # drag and drop stuff for notes
-        pdf_preview.drag_source_set(gtk.gdk.BUTTON1_MASK, [PDF_PREVIEW_MOVE_NOTE_DND_ACTION], gtk.gdk.ACTION_MOVE)
+        pdf_preview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [PDF_PREVIEW_MOVE_NOTE_DND_ACTION], Gdk.DragAction.MOVE)
         pdf_preview.drag_source_set_icon_pixbuf(NOTE_ICON)
-        pdf_preview.drag_dest_set(gtk.DEST_DEFAULT_ALL, [PDF_PREVIEW_MOVE_NOTE_DND_ACTION], gtk.gdk.ACTION_MOVE)
+        Gtk.drag_dest_set(pdf_preview, Gtk.DEST_DEFAULT_ALL, [PDF_PREVIEW_MOVE_NOTE_DND_ACTION], Gdk.DragAction.MOVE)
         pdf_preview.connect('drag-drop', self.handle_pdf_preview_drag_drop_event)
 
         self.ui.get_object('button_move_previous_page').connect('clicked', lambda x: self.goto_pdf_page(self.pdf_preview['current_page_number'] - 1))
@@ -754,15 +754,15 @@ class MainGUI:
 
         author_filter = self.ui.get_object('author_filter')
         # id, author, paper_count
-        self.author_filter_model = gtk.ListStore(int, str, int)
+        self.author_filter_model = Gtk.ListStore(int, str, int)
         author_filter.set_model(self.author_filter_model)
-        author_filter.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-        column = gtk.TreeViewColumn("Author", gtk.CellRendererText(), text=1)
+        author_filter.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
+        column = Gtk.TreeViewColumn("Author", Gtk.CellRendererText(), text=1)
         column.set_min_width(128)
         column.set_expand(True)
         column.connect('clicked', sort_model_by_column, self.author_filter_model, 1)
         author_filter.append_column(column)
-        column = gtk.TreeViewColumn("Papers", gtk.CellRendererText(), text=2)
+        column = Gtk.TreeViewColumn("Papers", Gtk.CellRendererText(), text=2)
         column.connect('clicked', sort_model_by_column, self.author_filter_model, 2)
         author_filter.append_column(column)
         make_all_columns_resizeable_clickable_ellipsize(author_filter.get_columns())
@@ -772,18 +772,18 @@ class MainGUI:
 
         organization_filter = self.ui.get_object('organization_filter')
         # id, org, author_count, paper_count
-        self.organization_filter_model = gtk.ListStore(int, str, int, int)
+        self.organization_filter_model = Gtk.ListStore(int, str, int, int)
         organization_filter.set_model(self.organization_filter_model)
-        organization_filter.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-        column = gtk.TreeViewColumn("Organization", gtk.CellRendererText(), text=1)
+        organization_filter.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
+        column = Gtk.TreeViewColumn("Organization", Gtk.CellRendererText(), text=1)
         column.set_min_width(128)
         column.set_expand(True)
         column.connect('clicked', sort_model_by_column, self.organization_filter_model, 1)
         organization_filter.append_column(column)
-        column = gtk.TreeViewColumn("Authors", gtk.CellRendererText(), text=2)
+        column = Gtk.TreeViewColumn("Authors", Gtk.CellRendererText(), text=2)
         column.connect('clicked', sort_model_by_column, self.organization_filter_model, 2)
         organization_filter.append_column(column)
-        column = gtk.TreeViewColumn("Papers", gtk.CellRendererText(), text=3)
+        column = Gtk.TreeViewColumn("Papers", Gtk.CellRendererText(), text=3)
         column.connect('clicked', sort_model_by_column, self.organization_filter_model, 3)
         organization_filter.append_column(column)
         make_all_columns_resizeable_clickable_ellipsize(organization_filter.get_columns())
@@ -793,21 +793,21 @@ class MainGUI:
 
         source_filter = self.ui.get_object('source_filter')
         # id, name, issue, location, publisher, date
-        self.source_filter_model = gtk.ListStore(int, str, str, str, str, str)
-        source_filter.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+        self.source_filter_model = Gtk.ListStore(int, str, str, str, str, str)
+        source_filter.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
         source_filter.set_model(self.source_filter_model)
-        column = gtk.TreeViewColumn("Source", gtk.CellRendererText(), text=1)
+        column = Gtk.TreeViewColumn("Source", Gtk.CellRendererText(), text=1)
         column.set_min_width(128)
         column.set_expand(True)
         column.connect('clicked', sort_model_by_column, self.source_filter_model, 1)
         source_filter.append_column(column)
-        column = gtk.TreeViewColumn("Issue", gtk.CellRendererText(), text=2)
+        column = Gtk.TreeViewColumn("Issue", Gtk.CellRendererText(), text=2)
         column.connect('clicked', sort_model_by_column, self.source_filter_model, 2)
         source_filter.append_column(column)
-        column = gtk.TreeViewColumn("Location", gtk.CellRendererText(), text=3)
+        column = Gtk.TreeViewColumn("Location", Gtk.CellRendererText(), text=3)
         column.connect('clicked', sort_model_by_column, self.source_filter_model, 3)
         source_filter.append_column(column)
-        column = gtk.TreeViewColumn("Publisher", gtk.CellRendererText(), text=4)
+        column = Gtk.TreeViewColumn("Publisher", Gtk.CellRendererText(), text=4)
         column.connect('clicked', sort_model_by_column, self.source_filter_model, 4)
         source_filter.append_column(column)
         make_all_columns_resizeable_clickable_ellipsize(source_filter.get_columns())
@@ -833,19 +833,19 @@ class MainGUI:
     def init_bookmark_pane(self):
         treeview_bookmarks = self.ui.get_object('treeview_bookmarks')
         # id, page, title, updated, words
-        self.treeview_bookmarks_model = gtk.ListStore(int, int, str, str, int)
+        self.treeview_bookmarks_model = Gtk.ListStore(int, int, str, str, int)
         treeview_bookmarks.set_model(self.treeview_bookmarks_model)
-        column = gtk.TreeViewColumn("Page", gtk.CellRendererText(), markup=1)
+        column = Gtk.TreeViewColumn("Page", Gtk.CellRendererText(), markup=1)
         column.connect('clicked', sort_model_by_column, self.treeview_bookmarks_model, 1)
         treeview_bookmarks.append_column(column)
-        column = gtk.TreeViewColumn("Title", gtk.CellRendererText(), markup=2)
+        column = Gtk.TreeViewColumn("Title", Gtk.CellRendererText(), markup=2)
         column.set_expand(True)
         column.connect('clicked', sort_model_by_column, self.treeview_bookmarks_model, 2)
         treeview_bookmarks.append_column(column)
-        column = gtk.TreeViewColumn("Words", gtk.CellRendererText(), markup=4)
+        column = Gtk.TreeViewColumn("Words", Gtk.CellRendererText(), markup=4)
         column.connect('clicked', sort_model_by_column, self.treeview_bookmarks_model, 4)
         treeview_bookmarks.append_column(column)
-        column = gtk.TreeViewColumn("Updated", gtk.CellRendererText(), markup=3)
+        column = Gtk.TreeViewColumn("Updated", Gtk.CellRendererText(), markup=3)
         column.set_min_width(75)
         column.connect('clicked', sort_model_by_column, self.treeview_bookmarks_model, 3)
         treeview_bookmarks.append_column(column)
@@ -861,25 +861,25 @@ class MainGUI:
 
     def init_paper_information_pane(self):
         paper_notes = self.ui.get_object('paper_notes')
-        paper_notes.modify_base(gtk.STATE_NORMAL, gtk.gdk.color_parse("#fff7e8"))
-        paper_notes.modify_base(gtk.STATE_INSENSITIVE, gtk.gdk.color_parse("#ffffff"))
+        paper_notes.modify_base(Gtk.StateType.NORMAL, Gdk.color_parse("#fff7e8"))
+        paper_notes.modify_base(Gtk.StateType.INSENSITIVE, Gdk.color_parse("#ffffff"))
         pane = self.ui.get_object('paper_information_pane')
         # text
-        self.paper_information_pane_model = gtk.ListStore(str, str)
+        self.paper_information_pane_model = Gtk.ListStore(str, str)
         pane.set_model(self.paper_information_pane_model)
 
         pane.connect('size-allocate', self.resize_paper_information_pane)
 
-        column = gtk.TreeViewColumn("", gtk.CellRendererText(), markup=0)
+        column = Gtk.TreeViewColumn("", Gtk.CellRendererText(), markup=0)
         column.set_min_width(64)
         pane.append_column(column)
 
-        column = gtk.TreeViewColumn()
-        renderer = gtk.CellRendererText()
+        column = Gtk.TreeViewColumn()
+        renderer = Gtk.CellRendererText()
         #renderer.set_property('editable', True)
-        renderer.set_property('wrap-mode', pango.WRAP_WORD)
+        renderer.set_property('wrap-mode', Pango.WrapMode.WORD)
         renderer.set_property('wrap-width', 500)
-        column.pack_start(renderer, expand=True)
+        column.pack_start(renderer, True, True, 0)
         column.add_attribute(renderer, 'markup', 1)
         pane.append_column(column)
 
@@ -891,26 +891,26 @@ class MainGUI:
     def refresh_left_pane(self):
         left_pane = self.ui.get_object('left_pane')
         self.left_pane_model.clear()
-        self.left_pane_model.append(None, ('<b>My Library</b>', left_pane.render_icon(gtk.STOCK_HOME, gtk.ICON_SIZE_MENU), -1, False))
+        self.left_pane_model.append(None, ('<b>My Library</b>', left_pane.render_icon(Gtk.STOCK_HOME, Gtk.IconSize.MENU), -1, False))
         for playlist in Playlist.objects.filter(parent='0'):
             if playlist.search_text:
-                icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
+                icon = left_pane.render_icon(Gtk.STOCK_FIND, Gtk.IconSize.MENU)
             else:
-                icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
+                icon = left_pane.render_icon(Gtk.STOCK_DND_MULTIPLE, Gtk.IconSize.MENU)
             self.left_pane_model.append(self.left_pane_model.get_iter((0),), (playlist.title, icon, playlist.id, True))
-        self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>recently added</i>', left_pane.render_icon(gtk.STOCK_NEW, gtk.ICON_SIZE_MENU), -2, False))
-        self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>most often read</i>', left_pane.render_icon(gtk.STOCK_DIALOG_INFO, gtk.ICON_SIZE_MENU), -3, False))
-        self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>never read</i>', gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'applications-development.png')), -5, False))
-        self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>highest rated</i>', gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'emblem-favorite.png')), -4, False))
+        self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>recently added</i>', left_pane.render_icon(Gtk.STOCK_NEW, Gtk.IconSize.MENU), -2, False))
+        self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>most often read</i>', left_pane.render_icon(Gtk.STOCK_DIALOG_INFO, Gtk.IconSize.MENU), -3, False))
+        self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>never read</i>', GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'applications-development.png')), -5, False))
+        self.left_pane_model.append(self.left_pane_model.get_iter((0),), ('<i>highest rated</i>', GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'emblem-favorite.png')), -4, False))
 
         for _, provider in self.provider.iteritems():
             self.left_pane_model.append(None, (provider.name,
-                             gtk.gdk.pixbuf_new_from_file(os.path.join(RUN_FROM_DIR, 'icons', provider.icon)), -1, False))
+                             GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR, 'icons', provider.icon)), -1, False))
             for playlist in Playlist.objects.filter(parent=provider.label):
                 if playlist.search_text:
-                    icon = left_pane.render_icon(gtk.STOCK_FIND, gtk.ICON_SIZE_MENU)
+                    icon = left_pane.render_icon(Gtk.STOCK_FIND, Gtk.IconSize.MENU)
                 else:
-                    icon = left_pane.render_icon(gtk.STOCK_DND_MULTIPLE, gtk.ICON_SIZE_MENU)
+                    icon = left_pane.render_icon(Gtk.STOCK_DND_MULTIPLE, Gtk.IconSize.MENU)
                 self.left_pane_model.append(self.left_pane_model.get_iter((1),), (playlist.title, icon, playlist.id, True))
 
         left_pane.expand_all()
@@ -926,16 +926,16 @@ class MainGUI:
         self.ui.get_object('middle_pane_label').set_markup(liststore[rows[0]][0])
         self.middle_top_pane_model.clear()
 
-        button = gtk.ToolButton(gtk.STOCK_ADD)
-        button.set_tooltip(gtk.Tooltips(), 'Create a new document collection...')
+        button = Gtk.ToolButton(Gtk.STOCK_ADD)
+        button.set_tooltip(Gtk.Tooltips(), 'Create a new document collection...')
         button.connect('clicked', lambda x: self.create_playlist())
         button.show()
         left_pane_toolbar.insert(button, -1)
 
         try:
             self.current_playlist = Playlist.objects.get(id=liststore[rows[0]][2])
-            button = gtk.ToolButton(gtk.STOCK_DELETE)
-            button.set_tooltip(gtk.Tooltips(), 'Delete this collection...')
+            button = Gtk.ToolButton(Gtk.STOCK_DELETE)
+            button.set_tooltip(Gtk.Tooltips(), 'Delete this collection...')
             button.connect('clicked', lambda x: self.delete_playlist(self.current_playlist.id))
             button.show()
             left_pane_toolbar.insert(button, -1)
@@ -976,50 +976,50 @@ class MainGUI:
     def init_middle_top_pane(self):
         middle_top_pane = self.ui.get_object('middle_top_pane')
         # id, authors, title, journal, year, rating, abstract, icon, import_url, doi, created, updated, empty_str, pubmed_id, data, search provider
-        self.middle_top_pane_model = gtk.ListStore(int, str, str, str, str, int, str, gtk.gdk.Pixbuf, str, str, str, str, str, str, object, object)
+        self.middle_top_pane_model = Gtk.ListStore(int, str, str, str, str, int, str, GdkPixbuf.Pixbuf, str, str, str, str, str, str, object, object)
         middle_top_pane.set_model(self.middle_top_pane_model)
-        middle_top_pane.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+        middle_top_pane.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
         middle_top_pane.connect('button-press-event', self.handle_middle_top_pane_button_press_event)
 
-        #middle_top_pane.append_column( gtk.TreeViewColumn("", gtk.CellRendererToggle(), active=7) )
-        #column = gtk.TreeViewColumn("Title", gtk.CellRendererText(), markup=2)
+        #middle_top_pane.append_column( Gtk.TreeViewColumn("", Gtk.CellRendererToggle(), active=7) )
+        #column = Gtk.TreeViewColumn("Title", Gtk.CellRendererText(), markup=2)
         #column.set_min_width(256)
         #column.set_expand(True)
         #middle_top_pane.append_column( column )
 
-        column = gtk.TreeViewColumn()
+        column = Gtk.TreeViewColumn()
         column.set_title('Title')
         column.set_min_width(-1)
-        renderer = gtk.CellRendererPixbuf()
-        column.pack_start(renderer, expand=False)
+        renderer = Gtk.CellRendererPixbuf()
+        column.pack_start(renderer, False, True, 0)
         column.add_attribute(renderer, 'pixbuf', 7)
-        renderer = gtk.CellRendererText()
-        column.pack_start(renderer, expand=True)
+        renderer = Gtk.CellRendererText()
+        column.pack_start(renderer, True, True, 0)
         column.add_attribute(renderer, 'markup', 2)
         column.connect('clicked', sort_model_by_column, self.middle_top_pane_model, 2)
         middle_top_pane.append_column(column)
 
-        column = gtk.TreeViewColumn("Authors", gtk.CellRendererText(), markup=1)
+        column = Gtk.TreeViewColumn("Authors", Gtk.CellRendererText(), markup=1)
         column.set_min_width(-1)
         column.set_expand(True)
         column.connect('clicked', sort_model_by_column, self.middle_top_pane_model, 1)
         middle_top_pane.append_column(column)
-        column = gtk.TreeViewColumn("Journal", gtk.CellRendererText(), markup=3)
+        column = Gtk.TreeViewColumn("Journal", Gtk.CellRendererText(), markup=3)
         column.set_min_width(-1)
         column.set_expand(True)
         column.connect('clicked', sort_model_by_column, self.middle_top_pane_model, 3)
         middle_top_pane.append_column(column)
-        column = gtk.TreeViewColumn("Year", gtk.CellRendererText(), markup=4)
+        column = Gtk.TreeViewColumn("Year", Gtk.CellRendererText(), markup=4)
         column.set_min_width(-1)
         column.set_expand(False)
         column.connect('clicked', sort_model_by_column, self.middle_top_pane_model, 4)
         middle_top_pane.append_column(column)
-        column = gtk.TreeViewColumn("Rating", gtk.CellRendererProgress(), value=5, text=12)
+        column = Gtk.TreeViewColumn("Rating", Gtk.CellRendererProgress(), value=5, text=12)
         column.set_min_width(-1)
         column.set_expand(False)
         column.connect('clicked', sort_model_by_column, self.middle_top_pane_model, 5)
         middle_top_pane.append_column(column)
-        column = gtk.TreeViewColumn("Imported", gtk.CellRendererText(), markup=10)
+        column = Gtk.TreeViewColumn("Imported", Gtk.CellRendererText(), markup=10)
         column.set_min_width(80)
         column.set_expand(False)
         column.connect('clicked', sort_model_by_column, self.middle_top_pane_model, 10)
@@ -1030,9 +1030,9 @@ class MainGUI:
         middle_top_pane.connect('row-activated', self.handle_middle_top_pane_row_activated)
         middle_top_pane.get_selection().connect('changed', self.select_middle_top_pane_item)
 
-        middle_top_pane.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, [LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION, MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION], gtk.gdk.ACTION_COPY | gtk.gdk.ACTION_MOVE)
+        middle_top_pane.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, [LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION, MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION], Gdk.DragAction.COPY | Gdk.DragAction.MOVE)
         middle_top_pane.connect('drag-data-get', self.handle_middle_top_pane_drag_data_get)
-        middle_top_pane.enable_model_drag_dest([MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION], gtk.gdk.ACTION_MOVE)
+        middle_top_pane.enable_model_drag_dest([MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION], Gdk.DragAction.MOVE)
         middle_top_pane.connect('drag-data-received', self.handle_middle_top_pane_drag_data_received_event)
 
     def handle_middle_top_pane_row_activated(self, treeview, path, view_column):
@@ -1076,8 +1076,8 @@ class MainGUI:
                 treeview.set_cursor(path, col, 0)
                 playlist_id = self.left_pane_model.get_value(self.left_pane_model.get_iter(path), 2)
                 if playlist_id >= 0: #len(path)==2:
-                    menu = gtk.Menu()
-                    delete = gtk.ImageMenuItem(stock_id=gtk.STOCK_DELETE)
+                    menu = Gtk.Menu()
+                    delete = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_DELETE)
                     delete.connect('activate', lambda x: self.delete_playlist(playlist_id))
                     menu.append(delete)
                     menu.show_all()
@@ -1112,30 +1112,30 @@ class MainGUI:
 
         if event.button == 3:
             if self.displayed_paper and current_page_number >= 0:
-                menu = gtk.Menu()
+                menu = Gtk.Menu()
                 if bookmark:
                     if bookmark.page > 0:
-                        menuitem = gtk.MenuItem('Move to previous page')
+                        menuitem = Gtk.MenuItem('Move to previous page')
                         menuitem.connect('activate', lambda x, i: self.move_bookmark(bookmark, page=i), bookmark.page - 1)
                         menu.append(menuitem)
                     if bookmark.page < self.pdf_preview['n_pages'] - 1:
-                        menuitem = gtk.MenuItem('Move to next page')
+                        menuitem = Gtk.MenuItem('Move to next page')
                         menuitem.connect('activate', lambda x, i: self.move_bookmark(bookmark, page=i), bookmark.page + 1)
                         menu.append(menuitem)
                     if self.pdf_preview['n_pages'] > 1:
-                        menuitem = gtk.MenuItem('Move to page')
-                        submenu = gtk.Menu()
+                        menuitem = Gtk.MenuItem('Move to page')
+                        submenu = Gtk.Menu()
                         for i in range(0, self.pdf_preview['n_pages']):
-                            submenu_item = gtk.MenuItem(str(i + 1))
+                            submenu_item = Gtk.MenuItem(str(i + 1))
                             submenu_item.connect('activate', lambda x, i: self.move_bookmark(bookmark, i), i)
                             submenu.append(submenu_item)
                         menuitem.set_submenu(submenu)
                         menu.append(menuitem)
-                    delete = gtk.ImageMenuItem(stock_id=gtk.STOCK_DELETE)
+                    delete = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_DELETE)
                     delete.connect('activate', lambda x: self.delete_bookmark(bookmark.id))
                     menu.append(delete)
                 else:
-                    add = gtk.ImageMenuItem(stock_id=gtk.STOCK_ADD)
+                    add = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_ADD)
                     add.connect('activate', lambda x: self.add_bookmark(self.displayed_paper, current_page_number, x_percent, y_percent))
                     menu.append(add)
                 menu.show_all()
@@ -1181,16 +1181,16 @@ class MainGUI:
                 treeview.set_cursor(path, col, 0)
                 paper_id = self.middle_top_pane_model.get_value(self.middle_top_pane_model.get_iter(path), 0)
                 if paper_id >= 0: #len(path)==2:
-                    menu = gtk.Menu()
+                    menu = Gtk.Menu()
                     paper = Paper.objects.get(id=paper_id)
                     if paper and paper.full_text and os.path.isfile(paper.full_text.path):
-                        button = gtk.ImageMenuItem(gtk.STOCK_OPEN)
+                        button = Gtk.ImageMenuItem(Gtk.STOCK_OPEN)
                         button.connect('activate', lambda x: paper.open())
                         menu.append(button)
-                    button = gtk.ImageMenuItem(gtk.STOCK_EDIT)
+                    button = Gtk.ImageMenuItem(Gtk.STOCK_EDIT)
                     button.connect('activate', lambda x: PaperEditGUI(paper.id))
                     menu.append(button)
-                    button = gtk.ImageMenuItem(gtk.STOCK_DELETE)
+                    button = Gtk.ImageMenuItem(Gtk.STOCK_DELETE)
                     button.connect('activate', lambda x: self.delete_papers([paper.id]))
                     menu.append(button)
                     menu.show_all()
@@ -1209,25 +1209,25 @@ class MainGUI:
                 treeview.set_cursor(path, col, 0)
                 id = self.author_filter_model.get_value(self.author_filter_model.get_iter(path), 0)
                 if id >= 0: #len(path)==2:
-                    menu = gtk.Menu()
-                    edit = gtk.ImageMenuItem(stock_id=gtk.STOCK_EDIT)
+                    menu = Gtk.Menu()
+                    edit = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_EDIT)
                     edit.connect('activate', lambda x: AuthorEditGUI(id))
                     menu.append(edit)
-                    edit = gtk.MenuItem('Colleague Graph...')
+                    edit = Gtk.MenuItem('Colleague Graph...')
                     edit.connect('activate', lambda x: self.graph_authors([id]))
                     menu.append(edit)
 
-                    menuitem = gtk.MenuItem('Connect to...')
-                    submenu = gtk.Menu()
+                    menuitem = Gtk.MenuItem('Connect to...')
+                    submenu = Gtk.Menu()
                     for author in Author.objects.order_by('name'):
                         if author.id != id:
-                            menu_item = gtk.MenuItem(truncate_long_str(author.name))
+                            menu_item = Gtk.MenuItem(truncate_long_str(author.name))
                             menu_item.connect('activate', lambda x, author, id: AuthorEditGUI(id).connect(author, id), author, id)
                             submenu.append(menu_item)
                     menuitem.set_submenu(submenu)
                     menu.append(menuitem)
 
-                    delete = gtk.ImageMenuItem(stock_id=gtk.STOCK_DELETE)
+                    delete = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_DELETE)
                     delete.connect('activate', lambda x: self.delete_author(id))
                     menu.append(delete)
                     menu.show_all()
@@ -1246,11 +1246,11 @@ class MainGUI:
                 treeview.set_cursor(path, col, 0)
                 id = self.source_filter_model.get_value(self.source_filter_model.get_iter(path), 0)
                 if id >= 0: #len(path)==2:
-                    menu = gtk.Menu()
-                    edit = gtk.ImageMenuItem(stock_id=gtk.STOCK_EDIT)
+                    menu = Gtk.Menu()
+                    edit = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_EDIT)
                     edit.connect('activate', lambda x: SourceEditGUI(id))
                     menu.append(edit)
-                    delete = gtk.ImageMenuItem(stock_id=gtk.STOCK_DELETE)
+                    delete = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_DELETE)
                     delete.connect('activate', lambda x: self.delete_source(id))
                     menu.append(delete)
                     menu.show_all()
@@ -1269,8 +1269,8 @@ class MainGUI:
                 treeview.set_cursor(path, col, 0)
                 id = self.treeview_bookmarks_model.get_value(self.treeview_bookmarks_model.get_iter(path), 0)
                 if id >= 0: #len(path)==2:
-                    menu = gtk.Menu()
-                    delete = gtk.ImageMenuItem(stock_id=gtk.STOCK_DELETE)
+                    menu = Gtk.Menu()
+                    delete = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_DELETE)
                     delete.connect('activate', lambda x: self.delete_bookmark(id))
                     menu.append(delete)
                     menu.show_all()
@@ -1289,11 +1289,11 @@ class MainGUI:
                 treeview.set_cursor(path, col, 0)
                 id = self.organization_filter_model.get_value(self.organization_filter_model.get_iter(path), 0)
                 if id >= 0: #len(path)==2:
-                    menu = gtk.Menu()
-                    edit = gtk.ImageMenuItem(stock_id=gtk.STOCK_EDIT)
+                    menu = Gtk.Menu()
+                    edit = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_EDIT)
                     edit.connect('activate', lambda x: OrganizationEditGUI(id))
                     menu.append(edit)
-                    delete = gtk.ImageMenuItem(stock_id=gtk.STOCK_DELETE)
+                    delete = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_DELETE)
                     delete.connect('activate', lambda x: self.delete_organization(id))
                     menu.append(delete)
                     menu.show_all()
@@ -1330,14 +1330,14 @@ class MainGUI:
                         break
                 if path[0] == i:
                     return
-                if path[0] == i + 1 and (position == gtk.TREE_VIEW_DROP_AFTER or position == gtk.TREE_VIEW_DROP_INTO_OR_AFTER):
+                if path[0] == i + 1 and (position == Gtk.TreeViewDropPosition.AFTER or position == Gtk.TreeViewDropPosition.INTO_OR_AFTER):
                     return
-                if path[0] == i - 1 and (position == gtk.TREE_VIEW_DROP_BEFORE or position == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE):
+                if path[0] == i - 1 and (position == Gtk.TreeViewDropPosition.BEFORE or position == Gtk.TreeViewDropPosition.INTO_OR_BEFORE):
                     return
                 paper_list[i] = None
-                if position == gtk.TREE_VIEW_DROP_BEFORE or position == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE:
+                if position == Gtk.TreeViewDropPosition.BEFORE or position == Gtk.TreeViewDropPosition.INTO_OR_BEFORE:
                     paper_list.insert(path[0], paper)
-                if position == gtk.TREE_VIEW_DROP_AFTER or position == gtk.TREE_VIEW_DROP_INTO_OR_AFTER:
+                if position == Gtk.TreeViewDropPosition.AFTER or position == Gtk.TreeViewDropPosition.INTO_OR_AFTER:
                     paper_list.insert(path[0] + 1, paper)
                 paper_list.remove(None)
                 playlist.papers.clear()
@@ -1355,13 +1355,13 @@ class MainGUI:
             model, source = treeview.get_selection().get_selected()
             target = model.get_iter(target_path)
             if len(target_path) > 1 and target_path[0] == 0:
-                treeview.enable_model_drag_dest([LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION], gtk.gdk.ACTION_MOVE)
+                treeview.enable_model_drag_dest([LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION], Gdk.DragAction.MOVE)
             else:
-                treeview.enable_model_drag_dest([], gtk.gdk.ACTION_MOVE)
+                treeview.enable_model_drag_dest([], Gdk.DragAction.MOVE)
         except:
             # this will occur when we're not over a target
             # traceback.print_exc()
-            treeview.enable_model_drag_dest([], gtk.gdk.ACTION_MOVE)
+            treeview.enable_model_drag_dest([], Gdk.DragAction.MOVE)
 
     def handle_playlist_edited(self, renderer, path, new_text):
         playlist_id = self.left_pane_model.get_value(self.left_pane_model.get_iter_from_string(path), 2)
@@ -1400,8 +1400,8 @@ class MainGUI:
             status = []
             if paper and paper.full_text and os.path.isfile(paper.full_text.path):
                 status.append('Full text saved in local library.')
-                button = gtk.ToolButton(gtk.STOCK_OPEN)
-                button.set_tooltip(gtk.Tooltips(), 'Open the full text of this paper in a new window...')
+                button = Gtk.ToolButton(Gtk.STOCK_OPEN)
+                button.set_tooltip(Gtk.Tooltips(), 'Open the full text of this paper in a new window...')
                 button.connect('clicked', lambda x: paper.open())
                 paper_information_toolbar.insert(button, -1)
             if status:
@@ -1417,18 +1417,18 @@ class MainGUI:
             #self.ui.get_object('paper_information_pane').get_buffer().set_text( '\n'.join(description) )            
 
             if liststore[rows[0]][8]:
-                button = gtk.ToolButton(gtk.STOCK_HOME)
-                button.set_tooltip(gtk.Tooltips(), 'Open this URL in your browser...')
+                button = Gtk.ToolButton(Gtk.STOCK_HOME)
+                button.set_tooltip(Gtk.Tooltips(), 'Open this URL in your browser...')
                 button.connect('clicked', lambda x: desktop.open(liststore[rows[0]][8]))
                 paper_information_toolbar.insert(button, -1)
                 if paper:
-                    button = gtk.ToolButton(gtk.STOCK_REFRESH)
-                    button.set_tooltip(gtk.Tooltips(), 'Re-add this paper to your library...')
+                    button = Gtk.ToolButton(Gtk.STOCK_REFRESH)
+                    button.set_tooltip(Gtk.Tooltips(), 'Re-add this paper to your library...')
                     button.connect('clicked', lambda x: fetch_citation_via_middle_top_pane_row(liststore[rows[0]]))
                     paper_information_toolbar.insert(button, -1)
                 else:
-                    button = gtk.ToolButton(gtk.STOCK_ADD)
-                    button.set_tooltip(gtk.Tooltips(), 'Add this paper to your library...')
+                    button = Gtk.ToolButton(Gtk.STOCK_ADD)
+                    button.set_tooltip(Gtk.Tooltips(), 'Add this paper to your library...')
                     button.connect('clicked', lambda x: fetch_citation_via_middle_top_pane_row(liststore[rows[0]]))
                     paper_information_toolbar.insert(button, -1)
 
@@ -1454,43 +1454,43 @@ class MainGUI:
 
                 self.update_bookmark_pane_from_paper(self.displayed_paper)
 
-                button = gtk.ToolButton(gtk.STOCK_EDIT)
-                button.set_tooltip(gtk.Tooltips(), 'Edit this paper...')
+                button = Gtk.ToolButton(Gtk.STOCK_EDIT)
+                button.set_tooltip(Gtk.Tooltips(), 'Edit this paper...')
                 button.connect('clicked', lambda x: PaperEditGUI(paper.id))
                 paper_information_toolbar.insert(button, -1)
 
                 if self.current_playlist:
-                    button = gtk.ToolButton(gtk.STOCK_REMOVE)
-                    button.set_tooltip(gtk.Tooltips(), 'Remove this paper from this collection...')
+                    button = Gtk.ToolButton(Gtk.STOCK_REMOVE)
+                    button.set_tooltip(Gtk.Tooltips(), 'Remove this paper from this collection...')
                     button.connect('clicked', lambda x: self.remove_papers_from_current_playlist([paper.id]))
                     paper_information_toolbar.insert(button, -1)
 
                 if importable_references or importable_citations:
-                    import_button = gtk.MenuToolButton(gtk.STOCK_ADD)
-                    import_button.set_tooltip(gtk.Tooltips(), 'Import all cited and referenced documents...(%i)' % len(importable_references.union(importable_citations)))
+                    import_button = Gtk.MenuToolButton(Gtk.STOCK_ADD)
+                    import_button.set_tooltip(Gtk.Tooltips(), 'Import all cited and referenced documents...(%i)' % len(importable_references.union(importable_citations)))
                     import_button.connect('clicked', lambda x: fetch_citations_via_references(importable_references.union(importable_citations)))
                     paper_information_toolbar.insert(import_button, -1)
-                    import_button_menu = gtk.Menu()
+                    import_button_menu = Gtk.Menu()
                     if importable_citations:
-                        menu_item = gtk.MenuItem('Import all cited documents (%i)' % len(importable_citations))
+                        menu_item = Gtk.MenuItem('Import all cited documents (%i)' % len(importable_citations))
                         menu_item.connect('activate', lambda x: fetch_citations_via_references(importable_citations))
                         import_button_menu.append(menu_item)
-                        menu_item = gtk.MenuItem('Import specific cited document')
-                        import_button_submenu = gtk.Menu()
+                        menu_item = Gtk.MenuItem('Import specific cited document')
+                        import_button_submenu = Gtk.Menu()
                         for citation in importable_citations:
-                            submenu_item = gtk.MenuItem(truncate_long_str(citation.line_from_referenced_paper))
+                            submenu_item = Gtk.MenuItem(truncate_long_str(citation.line_from_referenced_paper))
                             submenu_item.connect('activate', lambda x: fetch_citations_via_references((citation,)))
                             import_button_submenu.append(submenu_item)
                         menu_item.set_submenu(import_button_submenu)
                         import_button_menu.append(menu_item)
                     if importable_references:
-                        menu_item = gtk.MenuItem('Import all referenced documents (%i)' % len(importable_references))
+                        menu_item = Gtk.MenuItem('Import all referenced documents (%i)' % len(importable_references))
                         menu_item.connect('activate', lambda x: fetch_citations_via_references(importable_references))
                         import_button_menu.append(menu_item)
-                        menu_item = gtk.MenuItem('Import specific referenced document')
-                        import_button_submenu = gtk.Menu()
+                        menu_item = Gtk.MenuItem('Import specific referenced document')
+                        import_button_submenu = Gtk.Menu()
                         for reference in importable_references:
-                            submenu_item = gtk.MenuItem(truncate_long_str(reference.line_from_referencing_paper))
+                            submenu_item = Gtk.MenuItem(truncate_long_str(reference.line_from_referencing_paper))
                             submenu_item.connect('activate', lambda x: fetch_citations_via_references((reference,)))
                             import_button_submenu.append(submenu_item)
                         menu_item.set_submenu(import_button_submenu)
@@ -1498,11 +1498,11 @@ class MainGUI:
                     import_button_menu.show_all()
                     import_button.set_menu(import_button_menu)
 
-                    button = gtk.ToolButton() # GRAPH_ICON
-                    icon = gtk.Image()
+                    button = Gtk.ToolButton() # GRAPH_ICON
+                    icon = Gtk.Image()
                     icon.set_from_pixbuf(GRAPH_ICON)
                     button.set_icon_widget(icon)
-                    button.set_tooltip(gtk.Tooltips(), 'Generate document graph...')
+                    button.set_tooltip(Gtk.Tooltips(), 'Generate document graph...')
                     button.connect('clicked', lambda x: self.graph_papers_and_authors([paper.id]))
                     paper_information_toolbar.insert(button, -1)
 
@@ -1516,8 +1516,8 @@ class MainGUI:
                     downloadable_paper_urls.add(liststore[row][8])
             if len(downloadable_paper_urls):
                 self.paper_information_pane_model.append(('<b>Number of new papers:</b>', len(downloadable_paper_urls) ,))
-                button = gtk.ToolButton(gtk.STOCK_ADD)
-                button.set_tooltip(gtk.Tooltips(), 'Add new papers (%i) to your library...' % len(downloadable_paper_urls))
+                button = Gtk.ToolButton(Gtk.STOCK_ADD)
+                button.set_tooltip(Gtk.Tooltips(), 'Add new papers (%i) to your library...' % len(downloadable_paper_urls))
                 button.connect('clicked', lambda x: fetch_citations_via_urls(downloadable_paper_urls))
                 paper_information_toolbar.insert(button, -1)
 
@@ -1527,20 +1527,20 @@ class MainGUI:
                     selected_valid_paper_ids.append(liststore[row][0])
             log_debug('selected_valid_paper_ids: %s' % str(selected_valid_paper_ids))
             if len(selected_valid_paper_ids):
-                button = gtk.ToolButton(gtk.STOCK_REMOVE)
-                button.set_tooltip(gtk.Tooltips(), 'Remove these papers from your library...')
+                button = Gtk.ToolButton(Gtk.STOCK_REMOVE)
+                button.set_tooltip(Gtk.Tooltips(), 'Remove these papers from your library...')
                 button.connect('clicked', lambda x: self.delete_papers(selected_valid_paper_ids))
                 paper_information_toolbar.insert(button, -1)
-                button = gtk.ToolButton(gtk.STOCK_DND_MULTIPLE)
-                button.set_tooltip(gtk.Tooltips(), 'Create a new collection from these documents...')
+                button = Gtk.ToolButton(Gtk.STOCK_DND_MULTIPLE)
+                button.set_tooltip(Gtk.Tooltips(), 'Create a new collection from these documents...')
                 button.connect('clicked', lambda x: self.create_playlist(selected_valid_paper_ids))
                 paper_information_toolbar.insert(button, -1)
 
-                button = gtk.ToolButton() # GRAPH_ICON
-                icon = gtk.Image()
+                button = Gtk.ToolButton() # GRAPH_ICON
+                icon = Gtk.Image()
                 icon.set_from_pixbuf(GRAPH_ICON)
                 button.set_icon_widget(icon)
-                button.set_tooltip(gtk.Tooltips(), 'Generate document graph...')
+                button.set_tooltip(Gtk.Tooltips(), 'Generate document graph...')
                 button.connect('clicked', lambda x: self.graph_papers_and_authors(selected_valid_paper_ids))
                 paper_information_toolbar.insert(button, -1)
 
@@ -1676,15 +1676,15 @@ class MainGUI:
 
 
         if self.displayed_paper:
-            button = gtk.ToolButton(gtk.STOCK_ADD)
-            button.set_tooltip(gtk.Tooltips(), 'Add a new page note...')
+            button = Gtk.ToolButton(Gtk.STOCK_ADD)
+            button.set_tooltip(Gtk.Tooltips(), 'Add a new page note...')
             button.connect('clicked', lambda x, paper: Bookmark.objects.create(paper=paper, page=self.pdf_preview['current_page_number']).save() or self.update_bookmark_pane_from_paper(self.displayed_paper), self.displayed_paper)
             button.show()
             toolbar_bookmarks.insert(button, -1)
 
         if selected_bookmark_id != -1:
-            button = gtk.ToolButton(gtk.STOCK_DELETE)
-            button.set_tooltip(gtk.Tooltips(), 'Delete this page note...')
+            button = Gtk.ToolButton(Gtk.STOCK_DELETE)
+            button.set_tooltip(Gtk.Tooltips(), 'Delete this page note...')
             button.connect('clicked', lambda x: self.delete_bookmark(selected_bookmark_id))
             button.show()
             toolbar_bookmarks.insert(button, -1)
@@ -1708,13 +1708,13 @@ class MainGUI:
     def delete_papers(self, paper_ids):
         papers = Paper.objects.in_bulk(paper_ids).values()
         paper_list_text = '\n'.join([ ('<i>"%s"</i>' % str(paper.title)) for paper in papers ])
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete the following %s?\n\n%s\n\n' % (humanize_count(len(papers), 'paper', 'papers', places= -1), paper_list_text))
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             for paper in papers:
                 log_info('deleting paper: %s' % str(paper))
                 paper.delete()
@@ -1731,57 +1731,57 @@ class MainGUI:
             traceback.print_exc()
 
     def delete_playlist(self, id):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete this document collection?')
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             Playlist.objects.get(id=id).delete()
             self.refresh_left_pane()
 
     def delete_author(self, id):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete this author?')
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             Author.objects.get(id=id).delete()
             self.refresh_my_library_filter_pane()
 
     def delete_bookmark(self, id):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete this bookmark?')
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             Bookmark.objects.get(id=id).delete()
             self.update_bookmark_pane_from_paper(self.displayed_paper)
 
     def delete_source(self, id):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete this source?')
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             Source.objects.get(id=id).delete()
             self.refresh_my_library_filter_pane()
 
     def delete_organization(self, id):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete this organization?')
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             Organization.objects.get(id=id).delete()
             self.refresh_my_library_filter_pane()
 
@@ -1790,12 +1790,12 @@ class MainGUI:
         for column in middle_top_pane.get_columns():
             column.set_sort_indicator(False)
         if self.current_middle_top_pane_refresh_thread_ident == thread.get_ident():
-            gtk.gdk.threads_enter()
+            Gdk.threads_enter()
             self.middle_top_pane_model.clear()
             for row in rows:
                 self.middle_top_pane_model.append(row)
             middle_top_pane.columns_autosize()
-            gtk.gdk.threads_leave()
+            Gdk.threads_leave()
 
     def refresh_middle_pane_from_my_library(self, refresh_library_filter_pane=True):
         self.active_threads[ thread.get_ident() ] = 'searching local library...'
@@ -1873,7 +1873,7 @@ class MainGUI:
                 for author in paper.authors.order_by('id'):
                     authors.append(str(author.name))
                 if paper.full_text and os.path.isfile(paper.full_text.path):
-                    icon = self.ui.get_object('middle_top_pane').render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
+                    icon = self.ui.get_object('middle_top_pane').render_icon(Gtk.STOCK_DND, Gtk.IconSize.MENU)
                 else:
                     icon = None
                 if paper.source:
@@ -1911,11 +1911,11 @@ class MainGUI:
             del self.active_threads[ thread.get_ident() ]
 
     def refresh_my_library_count(self):
-        gtk.gdk.threads_enter()
+        Gdk.threads_enter()
         selection = self.ui.get_object('left_pane').get_selection()
         liststore, rows = selection.get_selected_rows()
         liststore.set_value(self.left_pane_model.get_iter((0,)), 0, '<b>My Library</b>  <span foreground="#888888">(%i)</span>' % Paper.objects.count())
-        gtk.gdk.threads_leave()
+        Gdk.threads_leave()
 
     def refresh_middle_pane_from_external(self, search_provider):
         log_debug('Starting external search in %s' % search_provider)
@@ -1939,8 +1939,8 @@ class MainGUI:
                     if existing_paper.full_text and \
                                os.path.isfile(existing_paper.full_text.path):
                         info['icon'] = self.ui.get_object('middle_top_pane').\
-                                        render_icon(gtk.STOCK_DND,
-                                        gtk.ICON_SIZE_MENU)
+                                        render_icon(Gtk.STOCK_DND,
+                                        Gtk.IconSize.MENU)
                 except Paper.DoesNotExist:
                     pass
 
@@ -1961,7 +1961,7 @@ class AuthorEditGUI:
             self.author = Author.objects.create()
         else:
             self.author = Author.objects.get(id=author_id)
-        self.ui = gtk.Builder()
+        self.ui = Gtk.Builder()
         self.ui.add_from_file(RUN_FROM_DIR + 'author_edit_gui.xml')
         self.author_edit_dialog = self.ui.get_object('author_edit_dialog')
         self.author_edit_dialog.connect("delete-event", self.author_edit_dialog.destroy)
@@ -1972,26 +1972,26 @@ class AuthorEditGUI:
         self.ui.get_object('entry_name').set_text(self.author.name)
         self.ui.get_object('label_paper_count').set_text(str(self.author.paper_set.count()))
         self.ui.get_object('notes').get_buffer().set_text(self.author.notes)
-        self.ui.get_object('notes').modify_base(gtk.STATE_NORMAL, gtk.gdk.color_parse("#fff7e8"))
+        self.ui.get_object('notes').modify_base(Gtk.StateType.NORMAL, Gdk.color_parse("#fff7e8"))
         self.ui.get_object('rating').set_value(self.author.rating)
 
         treeview_organizations = self.ui.get_object('treeview_organizations')
         # id, org, location
-        self.organizations_model = gtk.ListStore(int, str, str)
+        self.organizations_model = Gtk.ListStore(int, str, str)
         treeview_organizations.set_model(self.organizations_model)
-        treeview_organizations.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-        renderer = gtk.CellRendererText()
+        treeview_organizations.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
+        renderer = Gtk.CellRendererText()
         renderer.set_property('editable', True)
         renderer.connect('edited', lambda cellrenderertext, path, new_text: self.organizations_model.set_value(self.organizations_model.get_iter(path), 1, new_text) or self.update_organization_name(self.organizations_model.get_value(self.organizations_model.get_iter(path), 0), new_text))
-        column = gtk.TreeViewColumn("Organization", renderer, text=1)
+        column = Gtk.TreeViewColumn("Organization", renderer, text=1)
         column.set_min_width(128)
         column.set_expand(True)
         column.connect('clicked', sort_model_by_column, self.organizations_model, 1)
         treeview_organizations.append_column(column)
-        renderer = gtk.CellRendererText()
+        renderer = Gtk.CellRendererText()
         renderer.set_property('editable', True)
         renderer.connect('edited', lambda cellrenderertext, path, new_text: self.organizations_model.set_value(self.organizations_model.get_iter(path), 2, new_text) or self.update_organization_location(self.organizations_model.get_value(self.organizations_model.get_iter(path), 0), new_text))
-        column = gtk.TreeViewColumn("Location", renderer, text=2)
+        column = Gtk.TreeViewColumn("Location", renderer, text=2)
         column.set_min_width(128)
         column.set_expand(True)
         column.connect('clicked', sort_model_by_column, self.organizations_model, 2)
@@ -2001,8 +2001,8 @@ class AuthorEditGUI:
         for organization in self.author.organizations.order_by('name'):
             self.organizations_model.append((organization.id, organization.name, organization.location))
 
-        button = gtk.ToolButton(gtk.STOCK_ADD)
-        button.set_tooltip(gtk.Tooltips(), 'Add an organization...')
+        button = Gtk.ToolButton(Gtk.STOCK_ADD)
+        button.set_tooltip(Gtk.Tooltips(), 'Add an organization...')
         button.connect('clicked', lambda x: self.get_new_organizations_menu().popup(None, None, None, 0, 0))
         button.show()
         self.ui.get_object('toolbar_organizations').insert(button, -1)
@@ -2010,13 +2010,13 @@ class AuthorEditGUI:
         self.author_edit_dialog.show()
 
     def delete(self):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete this author?')
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             self.author.delete()
             self.author_edit_dialog.destroy()
             main_gui.refresh_middle_pane_search()
@@ -2043,11 +2043,11 @@ class AuthorEditGUI:
                 treeview.set_cursor(path, col, 0)
                 id = self.organizations_model.get_value(self.organizations_model.get_iter(path), 0)
                 if id >= 0:
-                    menu = gtk.Menu()
-                    remove = gtk.ImageMenuItem(stock_id=gtk.STOCK_REMOVE)
+                    menu = Gtk.Menu()
+                    remove = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_REMOVE)
                     remove.connect('activate', lambda x: self.organizations_model.remove(self.organizations_model.get_iter(path)))
                     menu.append(remove)
-                    menu_item = gtk.ImageMenuItem(stock_id=gtk.STOCK_ADD)
+                    menu_item = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_ADD)
                     menu_item.set_submenu(self.get_new_organizations_menu())
                     menu.append(menu_item)
                     menu.show_all()
@@ -2055,15 +2055,15 @@ class AuthorEditGUI:
             return True
 
     def get_new_organizations_menu(self):
-        button_submenu = gtk.Menu()
+        button_submenu = Gtk.Menu()
         org_ids = set()
         self.organizations_model.foreach(lambda model, path, iter: org_ids.add(model.get_value(iter, 0)))
         for organization in Organization.objects.order_by('name'):
             if organization.id not in org_ids and len(organization.name):
-                submenu_item = gtk.MenuItem(truncate_long_str(organization.name))
+                submenu_item = Gtk.MenuItem(truncate_long_str(organization.name))
                 submenu_item.connect('activate', lambda x, r: self.organizations_model.append(r), (organization.id, organization.name, organization.location))
                 button_submenu.append(submenu_item)
-        submenu_item = gtk.MenuItem('New...')
+        submenu_item = Gtk.MenuItem('New...')
         new_org = Organization.objects.create()
         submenu_item.connect('activate', lambda x, new_org: new_org.save() or self.organizations_model.append((new_org.id, new_org.name, new_org.location)), new_org)
         button_submenu.append(submenu_item)
@@ -2086,22 +2086,22 @@ class AuthorEditGUI:
         main_gui.refresh_middle_pane_search()
 
     def connect(self, author, id):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really merge this author with "%s"?' % author.name)
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             author.merge(id)
             self.author_edit_dialog.destroy()
             main_gui.refresh_middle_pane_search()
 
     def show_connect_menu(self):
-        menu = gtk.Menu()
+        menu = Gtk.Menu()
         for author in Author.objects.order_by('name'):
             if author.id != self.author.id:
-                menu_item = gtk.MenuItem(truncate_long_str(author.name))
+                menu_item = Gtk.MenuItem(truncate_long_str(author.name))
                 menu_item.connect('activate', lambda x, author, id: self.connect(author, id), author, self.author.id)
                 menu.append(menu_item)
         menu.popup(None, None, None, 0, 0)
@@ -2111,7 +2111,7 @@ class AuthorEditGUI:
 class OrganizationEditGUI:
     def __init__(self, id):
         self.organization = Organization.objects.get(id=id)
-        self.ui = gtk.Builder()
+        self.ui = Gtk.Builder()
         self.ui.add_from_file(RUN_FROM_DIR + 'organization_edit_gui.xml')
         self.edit_dialog = self.ui.get_object('organization_edit_dialog')
         self.edit_dialog.connect("delete-event", self.edit_dialog.destroy)
@@ -2124,13 +2124,13 @@ class OrganizationEditGUI:
         self.edit_dialog.show()
 
     def delete(self):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete this organization?')
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             self.organization.delete()
             self.edit_dialog.destroy()
             main_gui.refresh_middle_pane_search()
@@ -2143,22 +2143,22 @@ class OrganizationEditGUI:
         main_gui.refresh_middle_pane_search()
 
     def connect(self, organization, id):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really merge this organization with "%s"?' % organization.name)
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             organization.merge(id)
             self.edit_dialog.destroy()
             main_gui.refresh_middle_pane_search()
 
     def show_connect_menu(self):
-        menu = gtk.Menu()
+        menu = Gtk.Menu()
         for organization in Organization.objects.order_by('name'):
             if organization.id != self.organization.id:
-                menu_item = gtk.MenuItem(truncate_long_str(organization.name))
+                menu_item = Gtk.MenuItem(truncate_long_str(organization.name))
                 menu_item.connect('activate', lambda x, organization, id: self.connect(organization, id), organization, self.organization.id)
                 menu.append(menu_item)
         menu.popup(None, None, None, 0, 0)
@@ -2169,7 +2169,7 @@ class OrganizationEditGUI:
 class SourceEditGUI:
     def __init__(self, id):
         self.source = Source.objects.get(id=id)
-        self.ui = gtk.Builder()
+        self.ui = Gtk.Builder()
         self.ui.add_from_file(RUN_FROM_DIR + 'source_edit_gui.xml')
         self.edit_dialog = self.ui.get_object('source_edit_dialog')
         self.edit_dialog.connect("delete-event", self.edit_dialog.destroy)
@@ -2183,13 +2183,13 @@ class SourceEditGUI:
         self.edit_dialog.show()
 
     def delete(self):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete this source?')
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             self.source.delete()
             self.edit_dialog.destroy()
             main_gui.refresh_middle_pane_search()
@@ -2203,22 +2203,22 @@ class SourceEditGUI:
         main_gui.refresh_middle_pane_search()
 
     def connect(self, source, id):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really merge this source with "%s"?' % source.name)
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             source.merge(id)
             self.edit_dialog.destroy()
             main_gui.refresh_middle_pane_search()
 
     def show_connect_menu(self):
-        menu = gtk.Menu()
+        menu = Gtk.Menu()
         for source in Source.objects.order_by('name'):
             if source.id != self.source.id:
-                menu_item = gtk.MenuItem(truncate_long_str(source.name))
+                menu_item = Gtk.MenuItem(truncate_long_str(source.name))
                 menu_item.connect('activate', lambda x, source, id: self.connect(source, id), source, self.source.id)
                 menu.append(menu_item)
         menu.popup(None, None, None, 0, 0)
@@ -2229,7 +2229,7 @@ class SourceEditGUI:
 class ReferenceEditGUI:
     def __init__(self, id):
         self.reference = Reference.objects.get(id=id)
-        self.ui = gtk.Builder()
+        self.ui = Gtk.Builder()
         self.ui.add_from_file(RUN_FROM_DIR + 'reference_edit_gui.xml')
         self.edit_dialog = self.ui.get_object('reference_edit_dialog')
         self.edit_dialog.connect("delete-event", self.edit_dialog.destroy)
@@ -2258,13 +2258,13 @@ class ReferenceEditGUI:
         self.edit_dialog.show()
 
     def delete(self):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete this reference?')
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             self.reference.delete()
             self.edit_dialog.destroy()
 
@@ -2287,7 +2287,7 @@ class ReferenceEditGUI:
 class CitationEditGUI:
     def __init__(self, id):
         self.reference = Reference.objects.get(id=id)
-        self.ui = gtk.Builder()
+        self.ui = Gtk.Builder()
         self.ui.add_from_file(RUN_FROM_DIR + 'citation_edit_gui.xml')
         self.edit_dialog = self.ui.get_object('citation_edit_dialog')
         self.edit_dialog.connect("delete-event", self.edit_dialog.destroy)
@@ -2316,13 +2316,13 @@ class CitationEditGUI:
         self.edit_dialog.show()
 
     def delete(self):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete this reference?')
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             self.reference.delete()
             self.edit_dialog.destroy()
 
@@ -2344,7 +2344,7 @@ class CitationEditGUI:
 class PaperEditGUI:
     def __init__(self, id):
         self.paper = Paper.objects.get(id=id)
-        self.ui = gtk.Builder()
+        self.ui = Gtk.Builder()
         self.ui.add_from_file(RUN_FROM_DIR + 'paper_edit_gui.xml')
         self.edit_dialog = self.ui.get_object('paper_edit_dialog')
         self.edit_dialog.connect("delete-event", self.edit_dialog.destroy)
@@ -2364,11 +2364,11 @@ class PaperEditGUI:
 
         treeview_authors = self.ui.get_object('treeview_authors')
         # id, name
-        self.authors_model = gtk.ListStore(int, str)
+        self.authors_model = Gtk.ListStore(int, str)
         treeview_authors.set_model(self.authors_model)
-        treeview_authors.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-        renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("Author", renderer, text=1)
+        treeview_authors.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Author", renderer, text=1)
         column.set_expand(True)
         treeview_authors.append_column(column)
         make_all_columns_resizeable_clickable_ellipsize(treeview_authors.get_columns())
@@ -2376,8 +2376,8 @@ class PaperEditGUI:
         for author in self.paper.get_authors_in_order():
             self.authors_model.append((author.id, author.name))
 
-        button = gtk.ToolButton(gtk.STOCK_ADD)
-        button.set_tooltip(gtk.Tooltips(), 'Add an author...')
+        button = Gtk.ToolButton(Gtk.STOCK_ADD)
+        button.set_tooltip(Gtk.Tooltips(), 'Add an author...')
         button.connect('clicked', lambda x: self.get_new_authors_menu().popup(None, None, None, 0, 0))
         button.show()
         self.ui.get_object('toolbar_authors').insert(button, -1)
@@ -2398,16 +2398,16 @@ class PaperEditGUI:
     def init_references_tab(self):
         treeview_references = self.ui.get_object('treeview_references')
         # id, line, number, pix_buf
-        self.references_model = gtk.ListStore(int, str, str, gtk.gdk.Pixbuf)
+        self.references_model = Gtk.ListStore(int, str, str, GdkPixbuf.Pixbuf)
         treeview_references.set_model(self.references_model)
-        treeview_references.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-        treeview_references.append_column(gtk.TreeViewColumn("", gtk.CellRendererText(), markup=2))
-        column = gtk.TreeViewColumn()
-        renderer = gtk.CellRendererPixbuf()
-        column.pack_start(renderer, expand=False)
+        treeview_references.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
+        treeview_references.append_column(Gtk.TreeViewColumn("", Gtk.CellRendererText(), markup=2))
+        column = Gtk.TreeViewColumn()
+        renderer = Gtk.CellRendererPixbuf()
+        column.pack_start(renderer, False, True, 0)
         column.add_attribute(renderer, 'pixbuf', 3)
-        renderer = gtk.CellRendererText()
-        column.pack_start(renderer, expand=True)
+        renderer = Gtk.CellRendererText()
+        column.pack_start(renderer, True, True, 0)
         column.add_attribute(renderer, 'markup', 1)
         column.set_expand(True)
         treeview_references.append_column(column)
@@ -2416,13 +2416,13 @@ class PaperEditGUI:
         references = self.paper.reference_set.order_by('id')
         for i in range(0, len(references)):
             if references[i].referenced_paper and references[i].referenced_paper.full_text and os.path.isfile(references[i].referenced_paper.full_text.path):
-                icon = treeview_references.render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
+                icon = treeview_references.render_icon(Gtk.STOCK_DND, Gtk.IconSize.MENU)
             else:
                 icon = None
             self.references_model.append((references[i].id, references[i].line_from_referencing_paper , '<i>' + str(i + 1) + ':</i>', icon))
 
-        button = gtk.ToolButton(gtk.STOCK_ADD)
-        button.set_tooltip(gtk.Tooltips(), 'Add a reference...')
+        button = Gtk.ToolButton(Gtk.STOCK_ADD)
+        button.set_tooltip(Gtk.Tooltips(), 'Add a reference...')
         button.connect('clicked', lambda x: self.get_new_authors_menu().popup(None, None, None, 0, 0))
         button.show()
         #self.ui.get_object('toolbar_references').insert( button, -1 )
@@ -2430,16 +2430,16 @@ class PaperEditGUI:
     def init_citations_tab(self):
         treeview_citations = self.ui.get_object('treeview_citations')
         # id, line, number, pix_buf
-        self.citations_model = gtk.ListStore(int, str, str, gtk.gdk.Pixbuf)
+        self.citations_model = Gtk.ListStore(int, str, str, GdkPixbuf.Pixbuf)
         treeview_citations.set_model(self.citations_model)
-        treeview_citations.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-        #treeview_citations.append_column( gtk.TreeViewColumn("", gtk.CellRendererText(), markup=2) )
-        column = gtk.TreeViewColumn()
-        renderer = gtk.CellRendererPixbuf()
-        column.pack_start(renderer, expand=False)
+        treeview_citations.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
+        #treeview_citations.append_column( Gtk.TreeViewColumn("", Gtk.CellRendererText(), markup=2) )
+        column = Gtk.TreeViewColumn()
+        renderer = Gtk.CellRendererPixbuf()
+        column.pack_start(renderer, False, True, 0)
         column.add_attribute(renderer, 'pixbuf', 3)
-        renderer = gtk.CellRendererText()
-        column.pack_start(renderer, expand=True)
+        renderer = Gtk.CellRendererText()
+        column.pack_start(renderer, True, True, 0)
         column.add_attribute(renderer, 'markup', 1)
         column.set_expand(True)
         treeview_citations.append_column(column)
@@ -2448,25 +2448,25 @@ class PaperEditGUI:
         references = self.paper.citation_set.order_by('id')
         for i in range(0, len(references)):
             if references[i].referencing_paper and references[i].referencing_paper.full_text and os.path.isfile(references[i].referencing_paper.full_text.path):
-                icon = treeview_citations.render_icon(gtk.STOCK_DND, gtk.ICON_SIZE_MENU)
+                icon = treeview_citations.render_icon(Gtk.STOCK_DND, Gtk.IconSize.MENU)
             else:
                 icon = None
             self.citations_model.append((references[i].id, references[i].line_from_referenced_paper , '<i>' + str(i + 1) + ':</i>', icon))
 
-        button = gtk.ToolButton(gtk.STOCK_ADD)
-        button.set_tooltip(gtk.Tooltips(), 'Add a reference...')
+        button = Gtk.ToolButton(Gtk.STOCK_ADD)
+        button.set_tooltip(Gtk.Tooltips(), 'Add a reference...')
         button.connect('clicked', lambda x: self.get_new_authors_menu().popup(None, None, None, 0, 0))
         button.show()
         #self.ui.get_object('toolbar_references').insert( button, -1 )
 
     def delete(self):
-        dialog = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL)
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete this paper?')
-        dialog.set_default_response(gtk.RESPONSE_NO)
+        dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
-        if response == gtk.RESPONSE_YES:
+        if response == Gtk.ResponseType.YES:
             self.paper.delete()
             self.edit_dialog.destroy()
             main_gui.refresh_middle_pane_search()
@@ -2509,11 +2509,11 @@ class PaperEditGUI:
                 treeview.set_cursor(path, col, 0)
                 id = self.authors_model.get_value(self.authors_model.get_iter(path), 0)
                 if id >= 0:
-                    menu = gtk.Menu()
-                    remove = gtk.ImageMenuItem(stock_id=gtk.STOCK_REMOVE)
+                    menu = Gtk.Menu()
+                    remove = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_REMOVE)
                     remove.connect('activate', lambda x: self.authors_model.remove(self.authors_model.get_iter(path)))
                     menu.append(remove)
-                    menu_item = gtk.ImageMenuItem(stock_id=gtk.STOCK_ADD)
+                    menu_item = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_ADD)
                     menu_item.set_submenu(self.get_new_authors_menu())
                     menu.append(menu_item)
                     menu.show_all()
@@ -2533,12 +2533,12 @@ class PaperEditGUI:
                 id = self.references_model.get_value(self.references_model.get_iter(path), 0)
                 if id >= 0:
                     reference = Reference.objects.get(id=id)
-                    menu = gtk.Menu()
+                    menu = Gtk.Menu()
                     if reference.referenced_paper and reference.referenced_paper.full_text and os.path.isfile(reference.referenced_paper.full_text.path):
-                        menu_item = gtk.ImageMenuItem(stock_id=gtk.STOCK_OPEN)
+                        menu_item = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_OPEN)
                         menu_item.connect('activate', lambda x: reference.referenced_paper.open())
                         menu.append(menu_item)
-                    menu_item = gtk.ImageMenuItem(stock_id=gtk.STOCK_EDIT)
+                    menu_item = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_EDIT)
                     menu_item.connect('activate', lambda x: ReferenceEditGUI(reference.id))
                     menu.append(menu_item)
                     menu.show_all()
@@ -2558,12 +2558,12 @@ class PaperEditGUI:
                 id = self.citations_model.get_value(self.citations_model.get_iter(path), 0)
                 if id >= 0:
                     reference = Reference.objects.get(id=id)
-                    menu = gtk.Menu()
+                    menu = Gtk.Menu()
                     if reference.referencing_paper and reference.referencing_paper.full_text and os.path.isfile(reference.referencing_paper.full_text.path):
-                        menu_item = gtk.ImageMenuItem(stock_id=gtk.STOCK_OPEN)
+                        menu_item = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_OPEN)
                         menu_item.connect('activate', lambda x: reference.referenced_paper.open())
                         menu.append(menu_item)
-                    menu_item = gtk.ImageMenuItem(stock_id=gtk.STOCK_EDIT)
+                    menu_item = Gtk.ImageMenuItem(stock_id=Gtk.STOCK_EDIT)
                     menu_item.connect('activate', lambda x: CitationEditGUI(reference.id))
                     menu.append(menu_item)
                     menu.show_all()
@@ -2571,15 +2571,15 @@ class PaperEditGUI:
             return True
 
     def get_new_authors_menu(self):
-        button_submenu = gtk.Menu()
+        button_submenu = Gtk.Menu()
         author_ids = set()
         self.authors_model.foreach(lambda model, path, iter: author_ids.add(model.get_value(iter, 0)))
         for author in Author.objects.order_by('name'):
             if author.id not in author_ids and len(author.name):
-                submenu_item = gtk.MenuItem(truncate_long_str(author.name))
+                submenu_item = Gtk.MenuItem(truncate_long_str(author.name))
                 submenu_item.connect('activate', lambda x, r: self.authors_model.append(r), (author.id, author.name))
                 button_submenu.append(submenu_item)
-        submenu_item = gtk.MenuItem('New...')
+        submenu_item = Gtk.MenuItem('New...')
         submenu_item.connect('activate', lambda x: AuthorEditGUI(-1, callback_on_save=self.add_new_author))
         button_submenu.append(submenu_item)
         button_submenu.show_all()
@@ -2612,5 +2612,5 @@ if __name__ == "__main__":
     init_db()
     main_gui = MainGUI()
     importer.active_threads = main_gui.active_threads
-    gtk.main()
+    Gtk.main()
 
