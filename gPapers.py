@@ -728,12 +728,13 @@ class MainGUI:
         self.pdf_preview['current_page'].render(cr)
         if self.pdf_preview.get('current_page_number') != None:
             for bookmark in Bookmark.objects.filter(paper=self.displayed_paper, page=self.pdf_preview.get('current_page_number')):
-                x_pos = int(bookmark.x * widget.allocation.width)
-                y_pos = int(bookmark.y * widget.allocation.height)
+                x_pos = int(bookmark.x * widget.get_allocated_width())
+                y_pos = int(bookmark.y * widget.get_allocated_height())
                 if bookmark.notes:
-                    widget.window.draw_pixbuf(None, NOTE_ICON, 0, 0, x_pos, y_pos)
+                    Gdk.cairo_set_source_pixbuf(cr, NOTE_ICON, x_pos, y_pos)
                 else:
-                    widget.window.draw_pixbuf(None, BOOKMARK_ICON, 0, 0, x_pos, y_pos)
+                    Gdk.cairo_set_source_pixbuf(cr, BOOKMARK_ICON, x_pos, y_pos)
+                cr.paint()
 
 
     def init_my_library_filter_pane(self):
@@ -982,7 +983,7 @@ class MainGUI:
         if liststore[row][4] == 'local':
             self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(self.refresh_middle_pane_from_my_library, (True,))
         else:
-            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.provider[liststore[rows][4]]), ())
+            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.provider[liststore[row][4]]), ())
 
         self.select_middle_top_pane_item(self.ui.get_object('middle_top_pane').get_selection())
 
@@ -1100,8 +1101,8 @@ class MainGUI:
     def handle_pdf_preview_button_press_event(self, pdf_preview, event):
         x = int(event.x)
         y = int(event.y)
-        x_percent = 1.0 * x / pdf_preview.allocation.width
-        y_percent = 1.0 * y / pdf_preview.allocation.height
+        x_percent = 1.0 * x / pdf_preview.get_allocated_width()
+        y_percent = 1.0 * y / pdf_preview.get_allocated_height()
         time = event.time
         #print 'x, y, x_percent, y_percent, time', x, y, x_percent, y_percent, time
 
@@ -1110,8 +1111,8 @@ class MainGUI:
         self.current_bookmark = bookmark = None
         if self.displayed_paper and current_page_number >= 0:
             for b in self.displayed_paper.bookmark_set.filter(paper=self.displayed_paper, page=current_page_number):
-                x_delta = x - b.x * pdf_preview.allocation.width
-                y_delta = y - b.y * pdf_preview.allocation.height
+                x_delta = x - b.x * pdf_preview.get_allocated_width()
+                y_delta = y - b.y * pdf_preview.get_allocated_height()
                 if x_delta > 0 and x_delta < 16:
                     if y_delta > 0 and y_delta < 16:
                         self.current_bookmark = bookmark = b
@@ -1160,8 +1161,8 @@ class MainGUI:
     def handle_pdf_preview_drag_drop_event(self, o1, o2, x, y, o3):
         if self.current_bookmark:
             pdf_preview = self.ui.get_object('pdf_preview')
-            x_percent = 1.0 * x / pdf_preview.allocation.width
-            y_percent = 1.0 * y / pdf_preview.allocation.height
+            x_percent = 1.0 * x / pdf_preview.get_allocated_width()
+            y_percent = 1.0 * y / pdf_preview.get_allocated_height()
             self.current_bookmark.x = x_percent
             self.current_bookmark.y = y_percent
             self.current_bookmark.save()
@@ -1719,16 +1720,20 @@ class MainGUI:
     def echo_objects(self, a=None, b=None, c=None, d=None, e=None, f=None, g=None):
         print a, b, c, d, e, f, g
 
+    # FIXME: only save after some time without changes
     def update_paper_notes(self, text_buffer, id):
+        log_debug('update_paper_notes called for id %s' % str(id))
         paper = Paper.objects.get(id=id)
-        #print 'saving notes', text_buffer.get_text( text_buffer.get_start_iter(), text_buffer.get_end_iter() )
-        paper.notes = text_buffer.get_text(text_buffer.get_start_iter(), text_buffer.get_end_iter())
+        paper.notes = text_buffer.get_text(text_buffer.get_start_iter(),
+                                           text_buffer.get_end_iter(), False)
         paper.save()
 
+    # FIXME: only save after some time without changes
     def update_bookmark_notes(self, text_buffer, id):
+        log_debug('update_bookmark_notes called for id %s' % str(id))
         bookmark = Bookmark.objects.get(id=id)
-        #print 'saving notes', text_buffer.get_text( text_buffer.get_start_iter(), text_buffer.get_end_iter() )
-        bookmark.notes = text_buffer.get_text(text_buffer.get_start_iter(), text_buffer.get_end_iter())
+        bookmark.notes = text_buffer.get_text(text_buffer.get_start_iter(),
+                                              text_buffer.get_end_iter(), False)
         bookmark.save()
 
     def delete_papers(self, paper_ids):
