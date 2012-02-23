@@ -22,11 +22,8 @@ from htmlentitydefs import name2codepoint as n2cp
 import urllib, urlparse
 
 import gi
-pyGtk.require("2.0")
 from gi.repository import GObject
 from gi.repository import Gtk
-import gnome
-import gnome.ui
 from gi.repository import Pango
 
 from pyPdf import PdfFileReader
