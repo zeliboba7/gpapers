@@ -1533,7 +1533,7 @@ class MainGUI:
 
         else:
             self.update_bookmark_pane_from_paper(None)
-            self.paper_information_pane_model.append(('<b>Number of papers:</b>', len(rows) ,))
+            self.paper_information_pane_model.append(('<b>Number of papers:</b>', str(len(rows)) ,))
 
             downloadable_paper_urls = set()
             for row in rows:
@@ -1576,7 +1576,7 @@ class MainGUI:
         paper_information_toolbar.show_all()
 
     def graph_papers_and_authors(self, paper_ids=None):
-        log_debug('paper_ids: %s', str(paper_ids))
+        log_debug('paper_ids: %s' % str(paper_ids))
         g = []
         g.append('graph G {')
         g.append('\toverlap=false;')
