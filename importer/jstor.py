@@ -1,14 +1,92 @@
-class JSTORSearch(object):
+from gi.repository import Soup
+from BeautifulSoup import BeautifulStoneSoup
+from importer import SimpleWebSearchProvider, update_paper_from_dictionary
+from gPapers.models import Paper
+
+from logger import *
+
+QUERY_STRING = 'http://dfr.jstor.org/sru/?version=1.1&' + \
+                   'operation=searchRetrieve&query=%(query)s&' + \
+                   'maximumRecords=%(max)d&' + \
+                   'recordSchema=info:srw/schema/srw_jstor'
+
+
+class JSTORSearch(SimpleWebSearchProvider):
+
+    name = 'JSTOR'
+    label = 'jstor'
+    icon = 'favicon_jstor.ico'
 
     def __init__(self):
-        self.name = 'JSTOR'
-        self.label = 'jstor'
-        self.icon = 'favicon_jstor.ico'
-        self.search_cache = {}
+        SimpleWebSearchProvider.__init__(self)
+        # TODO: Make this configurable
+        self.max_results = 20
 
-    def clear_cache(self, text):
-        if text in self.search_cache:
-            del self.search_cache[text]
+    def prepare_search_message(self, search_string):
+        return Soup.Message.new(method='GET',
+                                uri_string=QUERY_STRING % {'query': search_string,
+                                                           'max' : self.max_results})
 
-    def search(self, search_text):
-        return [] #Not implemented yet
+    def _parse_result(self, result):
+        '''
+        Parses a single result (a "swr:recorddata" in JSTOR's XML) and returns
+        a dictionary with the info (title, authors, etc.).
+        '''
+        paper = {}
+        authors = []
+        for author in result.findAll('jstor:author'):
+            if author:
+                authors.append(author.string)
+        if authors:
+            paper['authors'] = authors
+
+        # define mappings from the JSTOR names to our own keywords
+        mappings = {'title': 'jstor:title',
+                    'doi': 'jstor:id',
+                    'abstract': 'jstor:abstract',
+                    'journal': 'jstor:journaltitle',
+                    'volume': 'jstor:volume',
+                    'issue': 'jstor:issue',
+                    'year': 'jstor:year',
+                    'pages': 'jstor:pagerange',
+                    'publisher': 'jstor:publisher'
+                    }
+
+        for our_key, jstor_key in mappings.items():
+            try:
+                paper[our_key] = result.find(jstor_key).string
+            except:
+                pass
+
+        # The year is a string like "YEAR: 2012" in JSTOR
+        if 'year' in paper:
+            try:
+                int(paper['year'])
+            except ValueError:
+                paper['year'] = paper['year'][-5:]
+
+        return paper
+
+    def parse_response(self, response):
+        parsed = BeautifulStoneSoup(response)
+        papers = []
+        for result in parsed.find('srw:records').findAll('srw:record'):
+            result = result.find('srw:recorddata')
+            log_debug('Single result: %s' % result.prettify())
+
+            paper = self._parse_result(result)
+
+            log_debug('JSTOR paper info: %s' % str(paper))
+
+            # Add the full data, useful for later import
+            paper['data'] = result
+            papers.append(paper)
+
+        return papers
+
+    def fill_in_paper_info(self, data, paper=None):
+        if not paper:
+            paper = Paper()
+        paper_info = self._parse_result(data)
+
+        return update_paper_from_dictionary(paper_info, paper)

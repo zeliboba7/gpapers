@@ -23,8 +23,10 @@ import urllib, urlparse
 
 import gi
 from gi.repository import GObject
+from gi.repository import Gdk
 from gi.repository import Gtk
 from gi.repository import Pango
+from gi.repository import Soup
 
 from pyPdf import PdfFileReader
 
@@ -40,8 +42,8 @@ p_bibtex = re.compile('[@][a-z]+[\s]*{([^<]*)}', re.IGNORECASE | re.DOTALL)
 p_whitespace = re.compile('[\s]+')
 p_doi = re.compile('doi *: *(10.[a-z0-9]+/[a-z0-9.]+)', re.IGNORECASE)
 
-# set our google scholar prefs (cookie-based)
-thread.start_new_thread(openanything.fetch, ('http://scholar.google.com/scholar_setprefs?num=100&scis=yes&scisf=4&submit=Save+Preferences',))
+soup_session = Soup.SessionAsync()
+
 
 def latex2unicode(s):
     """
@@ -63,22 +65,27 @@ def latex2unicode(s):
     # TODO: expand this to really work
     return s.replace('\c{s}', u's')
 
+
 def _decode_htmlentities(string):
     entity_re = re.compile("&(#?)(\d{1,5}|\w{1,8});")
     return entity_re.subn(_substitute_entity, string)[0]
+
 
 def html_strip(s):
     if isinstance(s, BeautifulSoup.Tag):
         s = ''.join([ html_strip(x) for x in s.contents ])
     return _decode_htmlentities(p_whitespace.sub(' ', str(s).replace('&nbsp;', ' ').strip()))
 
+
 def pango_escape(s):
     return s.replace('&', '&amp;').replace('>', '&gt;').replace('<', '&lt;')
+
 
 def get_md5_hexdigest_from_data(data):
     m = md5.new()
     m.update(data)
     return m.hexdigest()
+
 
 def _substitute_entity(match):
     ent = match.group(2)
@@ -92,6 +99,8 @@ def _substitute_entity(match):
         else:
             return match.group()
 
+
+#TODO: Remove all GUI code from this module
 def _should_we_reimport_paper(paper):
     Gdk.threads_enter()
     dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.OK_CANCEL, flags=Gtk.DialogFlags.MODAL)
@@ -104,7 +113,8 @@ def _should_we_reimport_paper(paper):
     Gdk.threads_leave()
     return response == Gtk.ResponseType.OK
 
-def get_or_create_paper_via(id=None, doi=None, pubmed_id=None,
+
+def get_or_create_paper_via(callback, id=None, doi=None, pubmed_id=None,
                             import_url=None, title=None, full_text_md5=None,
                             data=None, provider=None):
     """Tries to look up a paper by various forms of id, from most specific to
@@ -112,7 +122,7 @@ def get_or_create_paper_via(id=None, doi=None, pubmed_id=None,
     data and search_provider have to be specified."""
     #print id, doi, pubmed_id, import_url, title, full_text_md5
     paper = None
-    created = False
+
     if id >= 0:
         try: paper = Paper.objects.get(id=id)
         except: pass
@@ -156,16 +166,24 @@ def get_or_create_paper_via(id=None, doi=None, pubmed_id=None,
 
     if not paper:
         # it looks like we haven't seen this paper before...
-        if title == None: title = ''
-        if doi == None: doi = ''
-        if pubmed_id == None: pubmed_id = ''
-        if import_url == None: import_url = ''
-        paper = Paper.objects.create(doi=doi, pubmed_id=pubmed_id, import_url=import_url, title=title)
-        created = True
-        if provider:
-            provider.import_paper(data, paper=paper)
+        if not doi:
+            doi = ''
+        if not pubmed_id:
+            pubmed_id = ''
+        if not import_url:
+            import_url = ''
+        if not title:
+            title = ''
+        paper = Paper.objects.create(doi=doi, pubmed_id=pubmed_id,
+                                     import_url=import_url, title=title)
 
-    return paper, created
+    if provider:
+        # Get the paper from the search provider
+        provider.import_paper_after_search(data, paper=paper, callback=callback)
+    else:
+        callback(paper)
+
+
 
 
 def update_paper_from_bibtex_html(paper, html):
@@ -193,6 +211,7 @@ def update_paper_from_bibtex_html(paper, html):
 
         # create our paper if not provided for us
         if not paper:
+            # FIXME
             paper, created = get_or_create_paper_via(doi=bibtex.get('doi'), title=bibtex.get('title'))
             if created:
                 log_info('creating paper: %s' % str(paper))
@@ -244,8 +263,8 @@ def update_paper_from_bibtex_html(paper, html):
 
     return paper
 
-#TODO: Refactor import_pdf into a new function 
 
+#TODO: Refactor import_pdf into a new function 
 def import_citation(url, paper=None, callback=None):
 
     log_info('Importing URL: %s' % url)
@@ -280,6 +299,7 @@ def import_citation(url, paper=None, callback=None):
 
             if not paper:
                 md5_hexdigest = get_md5_hexdigest_from_data(data)
+                # FIXME
                 paper, created = get_or_create_paper_via(full_text_md5=md5_hexdigest)
                 if created:
                     if not filename:
@@ -322,6 +342,7 @@ def import_citation(url, paper=None, callback=None):
     if active_threads.has_key(thread.get_ident()):
         del active_threads[ thread.get_ident() ]
 
+
 def _import_google_scholar_citation(params, paper=None):
     log_info('downloading google scholar citation: %s' % params['url'])
     try:
@@ -349,6 +370,7 @@ def _import_google_scholar_citation(params, paper=None):
 
 p_html_a = re.compile("<a [^>]+>" , re.IGNORECASE)
 p_html_a_href = re.compile('''href *= *['"]([^'^"]+)['"]''' , re.IGNORECASE)
+
 
 def _import_unknown_citation(data, orig_url, paper=None):
 
@@ -404,7 +426,6 @@ def _import_unknown_citation(data, orig_url, paper=None):
         #Combine the base URL with the PDF link (necessary for relative URLs)
         pdf_link = urlparse.urljoin(orig_url, pdf_link)
         return import_citation(pdf_link)
-
 
 
 def find_and_attach_pdf(paper, urls, visited_urls=set()):
@@ -471,3 +492,208 @@ def find_and_attach_pdf(paper, urls, visited_urls=set()):
                                 continue
                 if promising_links: print promising_links
                 if find_and_attach_pdf(paper, list(promising_links), visited_urls=visited_urls): return
+
+
+def update_paper_from_dictionary(paper_info, paper):
+    assert paper is not None
+    # Journal
+    if 'journal' in paper_info:
+        #TODO: Volume etc
+        if 'issue' in paper_info:
+            source, created = Source.objects.get_or_create(name=paper_info['journal'],
+                                                           issue=paper_info['issue'])
+        else:
+            source, created = Source.objects.get_or_create(name=paper_info['journal'])
+        if created:
+            source.save()
+        paper.source = source
+
+    if 'pages' in paper_info:
+        paper.source_pages = paper_info['pages']
+
+    # Authors
+    if 'authors' in paper_info:
+        for author in paper_info['authors']:
+            author_obj, created = Author.objects.get_or_create(name=author)
+            paper.authors.add(author_obj)
+            if created:
+                author_obj.save()
+    # Simple attributes
+    attributes = ['title', 'abstract', 'year']
+
+    for attr in attributes:
+        if attr in paper_info:
+            paper.__setattr__(attr, paper_info[attr])
+
+    paper.save()
+    return paper
+
+class WebSearchProvider(object):
+    '''
+    Base class for all web search providers, i.e. websites or web APIs that 
+    return a number of search results for a search string.
+    
+    Implementation of new search providers should derive from this class and
+    have to provide the following attributes as class attributes:
+    * `name`: A human readable name that is used in the left column of the GUI,
+              e.g. "Google Scholar".
+    * `label`: A simple name that is used for saving searches to the database, 
+               e.g. "gscholar"
+    * `icon` : The name of an icon (expected in the `icons` subdirectory
+               currently) used in the left column of the GUI, e.g.
+               "favicon_google.ico". If no icon name is provided, a standard
+               icon is used.
+    * `unique_keys`: Defining under what circumstances a search result should be
+                     considered a duplicate of an existing paper in the
+                     database. For a PubMED search, for example, this should be
+                     'pubmed_id'. If the unique key is not set, 'doi' is used
+                     as a default.
+
+
+    A search provider has to provide the following methods:
+    * `search_async(self, search_string, callback)`
+    This method receives a search string from the GUI and should call the
+    callback with a list of search results where each single result is a
+    dictionary containing all the information that could be fetched from the
+    webpage, e.g.:
+    [{'title': 'A paper title', 'authors': ['Author A', 'Author B']},
+     {'title': 'Another paper', 'authors': ['Author C'],
+      'import_url': 'http://example.com/paper.pdf'}]
+    In addition, each paper can also contain arbitrary additional data as the 
+    value for a 'data' key. This could for example be used to save the full
+    HTML code of a search result (which might be useful for an import of this
+    paper) as opposed to only the extracted information.
+    This method should not block but use the :class:`AsyncSoupSession` object
+    `importer.soup_session` for getting the information. 
+        
+    * `import_paper_after_search(self, data, paper, callback, error_callback)`
+    This method receives the `data` (if any) previously returned from the
+    :method:`parse_website_response` method and a :class:`Paper` object, already
+    filled with the information previously returned from the search. It should
+    call the callback when it is finished processing (which may include getting
+    more information from webpages -- in this case the :class:`AsyncSoupSession`
+    object `importer.soup_session` should be used to asynchronously fetch the 
+    page(s). The callback function has to be called with the same :class:`Paper`
+    object (with any additional information now available filled in, generated
+    :class:`Author` objects, etc.) as the first argument. Optionally, a list of
+    URL strings can be given as the second argument, these URLs will be used 
+    in the order they are given, i.e. if fetching the document from the first
+    one is not successful, the second one will be tried etc. 
+    
+    The :method:`__init__` method of the subclass has to call the 
+    :method:`__init__` method of the superclass.   
+    '''
+
+    unique_key = 'doi'
+
+    def __init__(self):
+        # Remember previous search results so that no new search is necessary.
+        # Useful especially if switching between libraries/searches in the left
+        # pane
+        self.search_cache = {}
+
+    def __str__(self):
+        return self.name
+
+    def clear_cache(self, text):
+        if text in self.search_cache:
+            del self.search_cache[text]
+
+    def search(self, search_string, callback, error_callback):
+        if not search_string:
+            return []
+
+        if search_string in self.search_cache:
+            return self.search_cache[search_string]
+
+        try:
+            self.search_async(search_string, callback, error_callback)
+        except Exception as ex:
+            error_callback(ex, None)
+
+    def import_paper_after_search(self, data, paper, callback):
+        raise NotImplementedError()
+
+    def search_async(self, search_string, callback, error_callback):
+        raise NotImplementedError()
+
+class SimpleWebSearchProvider(WebSearchProvider):
+    '''
+    Convenience class for web searches that do a single request to a website for
+    a search and do not have to perform additional web requests to get more 
+    detailed info for a paper chosen for import.
+    
+    Such web search providers need only provide three functions:
+    * prepare_search_message 
+    * parse_response
+    * fill_in_paper_info
+    
+    '''
+
+    def __init__(self):
+        WebSearchProvider.__init__(self)
+
+    def search_async(self, search_string, callback, error_callback):
+        try:
+            # Call the method defined in the subclass
+            message = self.prepare_search_message(search_string)
+
+            def my_callback(session, message, user_data):
+                self.response_received(message, callback, error_callback,
+                                       user_data)
+
+            # Provide a tuple of label and search string as `user_data` to the
+            # callback -- this way it is clear to what search a result/error belongs
+            soup_session.queue_message(message, my_callback, (self.label, search_string))
+        except Exception as ex:
+            error_callback(ex, search_string)
+
+    def response_received(self, message, callback, error_callback,
+                            user_data):
+        '''
+        Will be called when the server returns a response.
+        '''
+        log_info('Received a response for %s' % str(user_data))
+        if message.status_code == Soup.KnownStatusCode.OK:
+            #try:
+                callback(user_data, self.parse_response(message.response_body.data))
+            #except Exception as ex:
+            #    error_callback(ex, user_data)
+        else:
+            error_callback(message.status_code, user_data)
+
+    def import_paper_after_search(self, data, paper, callback):
+        try:
+            callback(self.fill_in_paper_info(data, paper))
+        except Exception as ex:
+            log_error(str(ex))
+
+    # --------------------------------------------------------------------------
+    # Methods to overwrite in sub classes
+    # --------------------------------------------------------------------------
+    def prepare_search_message(self, search_string):
+        raise NotImplementedError()
+
+    def parse_response(self, response):
+        raise NotImplementedError()
+
+    def fill_in_paper_info(self, data, paper=None):
+        raise NotImplementedError()
+
+
+class WebRessourceProvider(object):
+    '''
+    In addition to searching, a :class:`WebRessourceProvider` can provide
+    information about a single paper, e.g. a PubMED provider can 
+    provide paper data given a PubMED ID. A method gives information about its
+    capabilities:
+    * `provides_infos_for_attribute(self, attribute)`
+    `attribute` is a string like 'pubmed_id'
+    
+    If the class return True for any attribute in the previous method (otherwise
+    the class is pretty useless...), it has to provide another method:
+    * `get_infos_for_attribute(self, paper, attribute, value, callback, error_callback)`        
+    '''
+
+    def provides_infos_for_attribute(self, attribute):
+        return False
