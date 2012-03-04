@@ -216,6 +216,11 @@ def import_citations_via_bibtexs(bibtexs):
 def import_citation_via_bibtex(bibtex):
     importer.update_paper_from_bibtex_html(None, bibtex)
 
+def paper_info_received(paper):
+    paper.save()
+    importer.import_citation(paper.import_url, paper=paper,
+                             callback=main_gui.refresh_middle_pane_search)
+
 def import_citation_via_middle_top_pane_row(row):
     # id, authors, title, journal, year, rating, abstract, icon, import_url, doi, created, updated, empty_str, pubmed_id
 
@@ -230,22 +235,14 @@ def import_citation_via_middle_top_pane_row(row):
     pubmed_id = row[13]
     data = row[14]
     provider = row[15]
-    paper, created = importer.get_or_create_paper_via(id=paper_id, doi=doi,
-                                                      pubmed_id=pubmed_id,
-                                                      import_url=import_url,
-                                                      title=title, data=data,
-                                                      provider=provider)
-
-    if title: paper.title = title
-    if abstract: paper.abstract = abstract
-    if import_url: paper.import_url = import_url
-    if doi: paper.doi = doi
-    if pubmed_id: paper.pubmed_id = pubmed_id
-
-    paper.save()
-    if created:
-        log_debug('Paper created: %s' % paper)
-    importer.import_citation(paper.import_url, paper=paper, callback=main_gui.refresh_middle_pane_search)
+    if doi and not import_url:
+        import_url = 'http://dx.doi.org/' + doi
+    importer.get_or_create_paper_via(id=paper_id, doi=doi,
+                                     pubmed_id=pubmed_id,
+                                     import_url=import_url,
+                                     title=title, data=data,
+                                     provider=provider,
+                                     callback=paper_info_received)
 
 
 def import_document(filename, data=None):
@@ -258,6 +255,7 @@ def import_document(filename, data=None):
     try:
         log_info('Importing paper: %s' % filename)
         md5_hexdigest = get_md5_hexdigest_from_data(data)
+        # FIXME
         paper, created = importer.get_or_create_paper_via(full_text_md5=md5_hexdigest)
         if created:
             #paper.title = filename
@@ -286,6 +284,18 @@ def show_html_error_dialog(code):
 def row_from_dictionary(info, provider=None):
     assert info is not None
 
+    created = info.get('created')
+    updated = info.get('updated')
+    try:
+        created = created.strftime('%Y-%m-%d')
+    except:
+        pass
+    try:
+        updated = updated.strftime('%Y-%m-%d')
+    except:
+        pass
+
+
     row = (
             info.get('id', -1), # paper id 
             pango_escape(', '.join([author for author in info.get('authors', [])])), # authors 
@@ -297,8 +307,8 @@ def row_from_dictionary(info, provider=None):
             info.get('icon'), # icon
             info.get('import_url'), # import_url
             info.get('doi'), # doi
-            info.get('created'), # created
-            info.get('updated'), # updated
+            created, # created
+            updated, # updated
             '', # empty_str
             info.get('pubmed_id'), # pubmed_id
             info.get('data'),
@@ -433,7 +443,7 @@ class MainGUI:
         dialog.destroy()
 
     def __init__(self):
-        self.provider = {'pubmed' : pubmed.PubMedSearch(),
+        self.search_providers = {'pubmed' : pubmed.PubMedSearch(),
                          'google_scholar' : google_scholar.GoogleScholarSearch(),
                          'jstor' : jstor.JSTORSearch()}
         self.displayed_paper = None
@@ -551,7 +561,7 @@ class MainGUI:
         playlist, created = Playlist.objects.get_or_create(
             title='search: <i>%s</i>' % self.ui.get_object('middle_pane_search').get_text(),
             search_text=self.ui.get_object('middle_pane_search').get_text(),
-            parent=self.provider[liststore[row][4]]
+            parent=self.search_providers[liststore[row][4]]
         )
         if created: playlist.save()
         self.refresh_left_pane()
@@ -573,7 +583,7 @@ class MainGUI:
         if liststore[row][4] != 'local':
             # For the external search providers: clear cache
             text = self.ui.get_object('middle_pane_search').get_text()
-            self.provider[liststore[row][4]].clear_cache(text)
+            self.search_providers[liststore[row][4]].clear_cache(text)
 
         self.last_middle_pane_search_string = None
 
@@ -914,7 +924,7 @@ class MainGUI:
                                     ('<i>highest rated</i>',
                                      FAVORITE_ICON, -4, False, 'local'))
 
-        for _, provider in self.provider.iteritems():
+        for _, provider in self.search_providers.iteritems():
             # FIXME: Load them in the providers
             provider_icon = GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR,
                                                                         'icons',
@@ -983,13 +993,18 @@ class MainGUI:
         if liststore[row][4] == 'local':
             self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(self.refresh_middle_pane_from_my_library, (True,))
         else:
-            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(lambda : self.refresh_middle_pane_from_external(self.provider[liststore[row][4]]), ())
+            def error_callback(data1, data2):
+                print 'Error callback, received data1: ', data1
+                print 'Error callback, received data2: ', data2
+
+            self.search_providers[liststore[row][4]].search(self.ui.get_object('middle_pane_search').get_text(),
+                                                            self.refresh_middle_pane_from_external, error_callback)
 
         self.select_middle_top_pane_item(self.ui.get_object('middle_top_pane').get_selection())
 
     def init_middle_top_pane(self):
         middle_top_pane = self.ui.get_object('middle_top_pane')
-        # id, authors, title, journal, year, rating, abstract, icon, import_url, doi, created, updated, empty_str, pubmed_id, data, search provider
+        # id, authors, title, journal, year, rating, abstract, icon, import_url, doi, created, updated, empty_str, pubmed_id, data, search search_providers
         self.middle_top_pane_model = Gtk.ListStore(int, str, str, str, str, int, str, GdkPixbuf.Pixbuf, str, str, str, str, str, str, object, object)
         middle_top_pane.set_model(self.middle_top_pane_model)
         middle_top_pane.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
@@ -1441,7 +1456,8 @@ class MainGUI:
 #                description.append( ref.line )
             #self.ui.get_object('paper_information_pane').get_buffer().set_text( '\n'.join(description) )            
 
-            if liststore[rows[0]][8]:
+            if liststore[rows[0]][8] or liststore[rows[0]][9]:
+                log_debug('URL or DOI exists')
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_HOME)
                 button.set_tooltip_text('Open this URL in your browser...')
                 button.connect('clicked', lambda x: desktop.open(liststore[rows[0]][8]))
@@ -1954,42 +1970,64 @@ class MainGUI:
         liststore.set_value(self.left_pane_model.get_iter((0,)), 0, '<b>My Library</b>  <span foreground="#888888">(%i)</span>' % Paper.objects.count())
         Gdk.threads_leave()
 
-    def refresh_middle_pane_from_external(self, search_provider):
-        log_debug('Starting external search in %s' % search_provider)
-        search_text = self.ui.get_object('middle_pane_search').get_text().strip()
-        if not search_text: return
-        self.active_threads[ thread.get_ident() ] = 'searching %s... (%s)' % (search_provider, search_text)
+    def refresh_middle_pane_from_external(self, search_info, results):
+        ''' 
+        This callback is called when an external search has finished and
+        returned results. `search_info` has to be a tuple of a search search_providers
+        label and the original search string, `results` is a list of dictionaries
+        containing the search results, e.g. 
+        [{'authors' : ['Author A', 'Author B], 'title': 'A title'},
+         {'authors' : ['Author C'], 'title': 'Another title'}]
+        
+        Before the search results are actually displayed in the GUI, it is
+        checked whether the same search search_providers is still active and the same
+        search string is still given. This should avoid situations where a 
+        previous search result arrives later and would otherwise overwrite the
+        results of a later search.
+        '''
+
+        label, search_string = search_info
+        search_provider = self.search_providers[label]
+        log_info('Received results for %s: %s' % (search_provider.name,
+                                                  search_string))
+
+        liststore, row = self.ui.get_object('left_pane_selection').get_selected()
+        current_label = liststore[row][4]
+        current_search_text = self.ui.get_object('middle_pane_search').get_text().strip()
+
+        if label != current_label or search_string != current_search_text:
+            log_info('Results are no longer wanted.')
+            return
+
+        log_info('Results are still wanted, processing further...')
+
         rows = []
-        try:
-            papers = search_provider.search(search_text)
-            for info in papers:
-                try:
-                    unique_key = search_provider.unique_key()
-                    kwds = {unique_key : info.get(unique_key)}
-                    existing_paper = Paper.objects.filter(**kwds)
-                    if not existing_paper:
-                        raise Paper.DoesNotExist()
-                    existing_paper = existing_paper[0]
-                    info['id'] = existing_paper.id
-                    info['created'] = existing_paper.created
-                    info['updated'] = existing_paper.updated
-                    if existing_paper.full_text and \
-                               os.path.isfile(existing_paper.full_text.path):
-                        info['icon'] = self.ui.get_object('middle_top_pane').\
-                                        render_icon(Gtk.STOCK_DND,
-                                        Gtk.IconSize.MENU)
-                except Paper.DoesNotExist:
-                    pass
+        for info in results:
+            try:
+                unique_key = search_provider.unique_key
+                kwds = {unique_key : info.get(unique_key)}
+                existing_paper = Paper.objects.filter(**kwds)
+                if not existing_paper:
+                    raise Paper.DoesNotExist()
+                existing_paper = existing_paper[0]
+                info['id'] = existing_paper.id
+                info['created'] = existing_paper.created
+                info['updated'] = existing_paper.updated
+                if existing_paper.full_text and \
+                           os.path.isfile(existing_paper.full_text.path):
+                    info['icon'] = self.ui.get_object('middle_top_pane').\
+                                    render_icon(Gtk.STOCK_DND,
+                                    Gtk.IconSize.MENU)
+            except Paper.DoesNotExist:
+                pass
 
-                # Add information to table 
-                rows.append(row_from_dictionary(info, search_provider))
+            # Add information to table 
+            rows.append(row_from_dictionary(info, search_provider))
 
-            self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
-        except:
-            traceback.print_exc()
+        self.middle_top_pane_model.clear()
+        for row in rows:
+            self.middle_top_pane_model.append(row)
 
-        if self.active_threads.has_key(thread.get_ident()):
-            del self.active_threads[ thread.get_ident() ]
 
 class AuthorEditGUI:
     def __init__(self, author_id, callback_on_save=None):
