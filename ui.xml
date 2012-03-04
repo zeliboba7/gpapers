@@ -1,6 +1,141 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <!-- interface-requires gtk+ 3.0 -->
+  <object class="GtkUIManager" id="uimanager1">
+    <child>
+      <object class="GtkActionGroup" id="actiongroup1">
+        <child>
+          <object class="GtkAction" id="menuitem_files">
+            <property name="name">menuitem_files</property>
+            <property name="label" translatable="yes">_File</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_import_files">
+            <property name="name">menuitem_import_files</property>
+            <property name="label" translatable="yes">Import Files…</property>
+          </object>
+        </child>        
+        <child>
+          <object class="GtkAction" id="menuitem_import_directory">
+            <property name="name">menuitem_import_directory</property>
+            <property name="label" translatable="yes">Import Directory…</property>
+          </object>
+        </child>                
+        <child>
+          <object class="GtkAction" id="menuitem_import_url">
+            <property name="name">menuitem_import_url</property>
+            <property name="label" translatable="yes">Import URL…</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_import_doi">
+            <property name="name">menuitem_import_doi</property>
+            <property name="label" translatable="yes">Import DOI…</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_import_bibtex">
+            <property name="name">menuitem_import_bibtex</property>
+            <property name="label" translatable="yes">Import BibTex…</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_quit">
+            <property name="stock_id">gtk-quit</property>
+            <property name="name">menuitem_quit</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_edit">
+            <property name="name">menuitem_edit</property>
+            <property name="label" translatable="yes">_Edit</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_cut">
+            <property name="stock_id">gtk-cut</property>
+            <property name="name">menuitem_cut</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_copy">
+            <property name="stock_id">gtk-copy</property>
+            <property name="name">menuitem_copy</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_paste">
+            <property name="stock_id">gtk-paste</property>
+            <property name="name">menuitem_paste</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_delete">
+            <property name="stock_id">gtk-delete</property>
+            <property name="name">menuitem_delete</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_view">
+            <property name="name">menuitem4</property>
+            <property name="label" translatable="yes">_View</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_author_graph">
+            <property name="name">menuitem_author_graph</property>
+            <property name="label" translatable="yes">Author Graph...</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_paper_graph">
+            <property name="name">menuitem_paper_graph</property>
+            <property name="label" translatable="yes">Paper Graph...</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_help">
+            <property name="name">menuitem_help</property>
+            <property name="label" translatable="yes">_Help</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkAction" id="menuitem_about">
+            <property name="stock_id">gtk-about</property>
+            <property name="name">menuitem_about</property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <ui>
+      <menubar name="menubar1">
+          <menu action="menuitem_files">
+          <menuitem action="menuitem_import_files"/>
+          <menuitem action="menuitem_import_directory"/>          
+          <menuitem action="menuitem_import_url"/>
+          <menuitem action="menuitem_import_doi"/>
+          <menuitem action="menuitem_import_bibtex"/>
+          <separator/>
+          <menuitem action="menuitem_quit"/>
+        </menu>
+        <menu action="menuitem_edit">
+          <menuitem action="menuitem_cut"/>
+          <menuitem action="menuitem_copy"/>
+          <menuitem action="menuitem_paste"/>
+          <menuitem action="menuitem_delete"/>
+
+        </menu>
+        <menu action="menuitem_view">
+          <menuitem action="menuitem_author_graph"/>
+          <menuitem action="menuitem_paper_graph"/>
+        </menu>
+        <menu action="menuitem_help">
+          <menuitem action="menuitem_about"/>
+        </menu>
+      </menubar>
+    </ui>
+  </object>  
   <object class="GtkWindow" id="main_window">
     <property name="width_request">800</property>
     <property name="height_request">600</property>
@@ -19,7 +154,7 @@
             <property name="can_focus">False</property>
             <property name="events">GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK</property>
             <child>
-              <object class="GtkMenuBar" id="menubar1">
+              <object class="GtkMenuBar" id="menubar1" constructor="uimanager1">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="events">GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK</property>
@@ -743,140 +878,5 @@
         </child>
       </object>
     </child>
-  </object>
-  <object class="GtkUIManager" id="uimanager1">
-    <child>
-      <object class="GtkActionGroup" id="actiongroup1">
-        <child>
-          <object class="GtkAction" id="menuitem_files">
-            <property name="name">menuitem_files</property>
-            <property name="label" translatable="yes">_File</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_import_files">
-            <property name="name">menuitem_import_files</property>
-            <property name="label" translatable="yes">Import Files…</property>
-          </object>
-        </child>        
-        <child>
-          <object class="GtkAction" id="menuitem_import_directory">
-            <property name="name">menuitem_import_directory</property>
-            <property name="label" translatable="yes">Import Directory…</property>
-          </object>
-        </child>                
-        <child>
-          <object class="GtkAction" id="menuitem_import_url">
-            <property name="name">menuitem_import_url</property>
-            <property name="label" translatable="yes">Import URL…</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_import_doi">
-            <property name="name">menuitem_import_doi</property>
-            <property name="label" translatable="yes">Import DOI…</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_import_bibtex">
-            <property name="name">menuitem_import_bibtex</property>
-            <property name="label" translatable="yes">Import BibTex…</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_quit">
-            <property name="stock_id">gtk-quit</property>
-            <property name="name">menuitem_quit</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_edit">
-            <property name="name">menuitem_edit</property>
-            <property name="label" translatable="yes">_Edit</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_cut">
-            <property name="stock_id">gtk-cut</property>
-            <property name="name">menuitem_cut</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_copy">
-            <property name="stock_id">gtk-copy</property>
-            <property name="name">menuitem_copy</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_paste">
-            <property name="stock_id">gtk-paste</property>
-            <property name="name">menuitem_paste</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_delete">
-            <property name="stock_id">gtk-delete</property>
-            <property name="name">menuitem_delete</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_view">
-            <property name="name">menuitem4</property>
-            <property name="label" translatable="yes">_View</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_author_graph">
-            <property name="name">menuitem_author_graph</property>
-            <property name="label" translatable="yes">Author Graph...</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_paper_graph">
-            <property name="name">menuitem_paper_graph</property>
-            <property name="label" translatable="yes">Paper Graph...</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_help">
-            <property name="name">menuitem_help</property>
-            <property name="label" translatable="yes">_Help</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkAction" id="menuitem_about">
-            <property name="stock_id">gtk-about</property>
-            <property name="name">menuitem_about</property>
-          </object>
-        </child>
-      </object>
-    </child>
-    <ui>
-      <menubar name="menubar1">
-          <menu action="menuitem_files">
-          <menuitem action="menuitem_import_files"/>
-          <menuitem action="menuitem_import_directory"/>          
-          <menuitem action="menuitem_import_url"/>
-          <menuitem action="menuitem_import_doi"/>
-          <menuitem action="menuitem_import_bibtex"/>
-          <separator/>
-          <menuitem action="menuitem_quit"/>
-        </menu>
-        <menu action="menuitem_edit">
-          <menuitem action="menuitem_cut"/>
-          <menuitem action="menuitem_copy"/>
-          <menuitem action="menuitem_paste"/>
-          <menuitem action="menuitem_delete"/>
-
-        </menu>
-        <menu action="menuitem_view">
-          <menuitem action="menuitem_author_graph"/>
-          <menuitem action="menuitem_paper_graph"/>
-        </menu>
-        <menu action="menuitem_help">
-          <menuitem action="menuitem_about"/>
-        </menu>
-      </menubar>
-    </ui>
   </object>
 </interface>
