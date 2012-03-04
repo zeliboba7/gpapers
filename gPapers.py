@@ -290,7 +290,8 @@ def row_from_dictionary(info, provider=None):
 
     row = (
             info.get('id', -1), # paper id 
-            pango_escape(', '.join([author for author in info.get('authors', [])])), # authors 
+            pango_escape(', '.join([author for author in
+                                    info.get('authors', [])])), # authors 
             pango_escape(info.get('title') or ''), # title 
             pango_escape(info.get('journal') or ''), # journal 
             info.get('year'), # year 
@@ -444,7 +445,13 @@ class MainGUI:
         self.main_window = self.ui.get_object('main_window')
         self.main_window.connect("delete-event", lambda x, y: sys.exit(0))
         self.init_menu()
+        # Save content of last search to avoid generating too many
+        # search events
+        self.last_middle_pane_search_string = ''
+        self.last_middle_pane_performed_search = ''
+        self.last_middle_pane_search_time = 0.0
         self.init_search_box()
+
         self.init_left_pane()
         self.init_my_library_filter_pane()
         self.init_middle_top_pane()
@@ -507,7 +514,9 @@ class MainGUI:
         self.ui.get_object('menuitem_about').connect('activate', self.show_about_dialog)
 
     def init_search_box(self):
-        thread.start_new_thread(self.watch_middle_pane_search, ())
+        # Check the search box for changes every 0.5 seconds
+        GObject.timeout_add(500, lambda x: self.middle_pane_search_changed(),
+                            None)
         self.ui.get_object('refresh_middle_pane_search').connect('clicked', lambda x: self.refresh_middle_pane_search())
         self.ui.get_object('clear_middle_pane_search').connect('clicked', lambda x: self.clear_all_search_and_filters())
         self.ui.get_object('save_smart_search').connect('clicked', lambda x: self.save_smart_search())
@@ -579,18 +588,23 @@ class MainGUI:
 
         self.last_middle_pane_search_string = None
 
-    #FIXME: Use signal instead -- and refactor
-    def watch_middle_pane_search(self):
-        self.last_middle_pane_search_string = ''
-        while True:
-            if self.last_middle_pane_search_string == None or self.ui.get_object('middle_pane_search').get_text() != self.last_middle_pane_search_string:
-                self.last_middle_pane_search_string = self.ui.get_object('middle_pane_search').get_text()
-                log_debug('middle search pane string changed')
-                #Gdk.threads_enter()
-                #self.ui.get_object('left_pane').get_selection().emit('changed')
-                GObject.idle_add(self.select_left_pane_item, self.ui.get_object('left_pane_selection'))
-                #Gdk.threads_leave()
-            time.sleep(1)
+
+    def middle_pane_search_changed(self):
+        search_text = self.ui.get_object('middle_pane_search').get_text()
+        # Only initiate a search if the string did not change since the last
+        # check
+        if search_text != self.last_middle_pane_search_string:
+            log_debug('Search text changed, doing nothing')
+            self.last_middle_pane_search_string = search_text
+        else:
+            self.last_middle_pane_search_string = search_text
+            # The search text was stable and we did not search for this text yet
+            if self.last_middle_pane_performed_search != search_text:
+                log_debug('Search text changed, initiating search')
+                self.last_middle_pane_performed_search = search_text
+                self.select_left_pane_item(self.ui.get_object('left_pane_selection'))
+
+        return True  # we do want repeated calls of the timeout
 
     def init_left_pane(self):
         '''
