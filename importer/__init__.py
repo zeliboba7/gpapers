@@ -100,20 +100,6 @@ def _substitute_entity(match):
             return match.group()
 
 
-#TODO: Remove all GUI code from this module
-def _should_we_reimport_paper(paper):
-    Gdk.threads_enter()
-    dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.OK_CANCEL, flags=Gtk.DialogFlags.MODAL)
-    #dialog.connect('response', lambda x,y: dialog.destroy())
-    dialog.set_markup('This paper already exists in your local library:\n\n<i>"%s"</i>\n(imported on %s)\n\nShould we continue the import, updating/overwriting the previous entry?' % (paper.title, str(paper.created.date())))
-    dialog.set_default_response(Gtk.ResponseType.OK)
-    dialog.show_all()
-    response = dialog.run()
-    dialog.destroy()
-    Gdk.threads_leave()
-    return response == Gtk.ResponseType.OK
-
-
 def get_or_create_paper_via(callback, id=None, doi=None, pubmed_id=None,
                             import_url=None, title=None, full_text_md5=None,
                             data=None, provider=None):
@@ -342,32 +328,6 @@ def import_citation(url, paper=None, callback=None):
     if active_threads.has_key(thread.get_ident()):
         del active_threads[ thread.get_ident() ]
 
-
-def _import_google_scholar_citation(params, paper=None):
-    log_info('downloading google scholar citation: %s' % params['url'])
-    try:
-        log_debug('parsing...')
-        soup = BeautifulSoup.BeautifulSoup(params['data'])
-
-        # search for bibtex link
-        def f(paper):
-            for a in soup.findAll('a'):
-                for c in a.contents:
-                    if str(c).lower().find('bibtex') != -1:
-                        log_debug('found bibtex link: %s' % a)
-                        params_bibtex = openanything.fetch('http://scholar.google.com' + a['href'])
-                        if params_bibtex['status'] == 200 or params_bibtex['status'] == 302:
-                            paper = update_paper_from_bibtex_html(paper, params_bibtex['data'])
-                            return
-        f(paper)
-
-        find_and_attach_pdf(paper, urls=[ x['href'] for x in soup.findAll('a', onmousedown=True) ])
-
-        log_info('imported paper: %s' % str(paper))
-        return paper
-    except:
-        traceback.print_exc()
-
 p_html_a = re.compile("<a [^>]+>" , re.IGNORECASE)
 p_html_a_href = re.compile('''href *= *['"]([^'^"]+)['"]''' , re.IGNORECASE)
 
@@ -495,6 +455,14 @@ def find_and_attach_pdf(paper, urls, visited_urls=set()):
 
 
 def update_paper_from_dictionary(paper_info, paper):
+    '''
+    Adds all information from a `paper_info` dictionary to the given
+    :class:`gPapers.model.Paper` object, creating and saving 
+    :class:`gPapers.model.Author` and :class:`gPapers.model.Source` objects
+    if necessary.
+    
+    Returns the `paper` object.
+    '''
     assert paper is not None
     # Journal
     if 'journal' in paper_info:
