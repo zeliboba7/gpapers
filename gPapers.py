@@ -18,14 +18,9 @@
 #    with this program; if not, write to the Free Software Foundation, Inc.,
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import commands, dircache, getopt, math, os, re, string, sys, thread, threading, time, traceback, urllib
+import commands, math, os, sys, thread, threading, time, traceback
 import mimetypes
-from datetime import date, datetime, timedelta
-from time import strptime
-
-import BeautifulSoup
-
-import sqlite3
+from datetime import datetime, timedelta
 
 from logger import *
 log_level_debug()
@@ -44,14 +39,12 @@ DATE_FORMAT = '%Y-%m-%d'
 
 # GUI imports
 try:
-    import gi
     from gi.repository import GObject
     from gi.repository import Gdk
     from gi.repository import Gtk
     from gi.repository import GdkPixbuf
     from gi.repository import Pango
     from gi.repository import Poppler
-    import cairo
     GObject.threads_init()
 except:
     traceback.print_exc()
@@ -66,17 +59,17 @@ PDF_PREVIEW_MOVE_NOTE_DND_ACTION = ('move_note', Gtk.TargetFlags.SAME_WIDGET, 2)
 
 import settings
 import desktop, openanything
-from django.template import defaultfilters
+
 os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
 import django.core.management
 django.core.management.setup_environ(settings)
 from django.db.models import Q
-from django.template import defaultfilters
+
 import deseb
 from gPapers.models import *
 import importer
-from importer import pango_escape
-from importer import html_strip, pango_escape, get_md5_hexdigest_from_data
+
+from importer import pango_escape, get_md5_hexdigest_from_data
 from importer import pubmed, google_scholar, jstor
 
 NOTE_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'note.png'))
@@ -1838,18 +1831,6 @@ class MainGUI:
             Organization.objects.get(id=id).delete()
             self.refresh_my_library_filter_pane()
 
-    def update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(self, rows):
-        middle_top_pane = self.ui.get_object('middle_top_pane')
-        for column in middle_top_pane.get_columns():
-            column.set_sort_indicator(False)
-        if self.current_middle_top_pane_refresh_thread_ident == thread.get_ident():
-            Gdk.threads_enter()
-            self.middle_top_pane_model.clear()
-            for row in rows:
-                self.middle_top_pane_model.append(row)
-            middle_top_pane.columns_autosize()
-            Gdk.threads_leave()
-
     def refresh_middle_pane_from_my_library(self, refresh_library_filter_pane=True):
         self.active_threads[ thread.get_ident() ] = 'searching local library...'
         try:
@@ -1930,7 +1911,7 @@ class MainGUI:
             for paper in papers:
                 authors = []
                 for author in paper.authors.order_by('id'):
-                    authors.append(str(author.name))
+                    authors.append(unicode(author.name))
                 if paper.full_text and os.path.isfile(paper.full_text.path):
                     icon = self.ui.get_object('middle_top_pane').render_icon(Gtk.STOCK_DND, Gtk.IconSize.MENU)
                 else:
@@ -1962,7 +1943,9 @@ class MainGUI:
                     None,
                     None
                 ))
-            self.update_middle_top_pane_from_row_list_if_we_are_still_the_preffered_thread(rows)
+            self.middle_top_pane_model.clear()
+            for row in rows:
+                self.middle_top_pane_model.append(row)
             self.refresh_my_library_count()
         except:
             traceback.print_exc()
@@ -1970,11 +1953,10 @@ class MainGUI:
             del self.active_threads[ thread.get_ident() ]
 
     def refresh_my_library_count(self):
-        Gdk.threads_enter()
         selection = self.ui.get_object('left_pane_selection')
         liststore, rows = selection.get_selected()
-        liststore.set_value(self.left_pane_model.get_iter((0,)), 0, '<b>My Library</b>  <span foreground="#888888">(%i)</span>' % Paper.objects.count())
-        Gdk.threads_leave()
+        liststore.set_value(self.left_pane_model.get_iter((0,)), 0,
+                            '<b>My Library</b>  <span foreground="#888888">(%i)</span>' % Paper.objects.count())
 
     def refresh_middle_pane_from_external(self, search_info, results):
         ''' 
