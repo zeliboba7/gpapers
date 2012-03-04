@@ -273,14 +273,6 @@ def import_document(filename, data=None):
         if paper:
             paper.delete()
 
-def show_html_error_dialog(code):
-    Gdk.threads_enter()
-    error = Gtk.MessageDialog(type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, flags=Gtk.DialogFlags.MODAL)
-    error.connect('response', lambda x, y: error.destroy())
-    error.set_markup('<b>Unable to Search External Repository</b>\n\nHTTP Error code: %d' % code)
-    error.run()
-    Gdk.threads_leave()
-
 def row_from_dictionary(info, provider=None):
     assert info is not None
 
