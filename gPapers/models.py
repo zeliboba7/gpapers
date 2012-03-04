@@ -232,7 +232,9 @@ class Paper(models.Model):
         list_display = ('id', 'doi', 'title')
 
     def __unicode__(self):
-        return 'Paper<%i: %s>' % (self.id, ' '.join([str(self.doi), str(self.title), str(self.authors.all())]))
+        return 'Paper<%i: %s>' % (self.id, ' '.join([unicode(self.doi),
+                                                     unicode(self.title),
+                                                     unicode(self.authors.all())]))
 
     def pretty_string(self):
         return '[' + ', '.join([ author.name for author in self.get_authors_in_order() ]) + '] ' + self.title
@@ -255,7 +257,7 @@ class Reference(models.Model):
         list_display = ('id', 'referencing_paper', 'line_from_referencing_paper', 'doi_from_referencing_paper', 'referenced_paper', 'line_from_referenced_paper', 'doi_from_referenced_paper')
 
     def __unicode__(self):
-        return 'Reference<%s,%s>' % (str(self.referencing_paper), str(self.referenced_paper))
+        return 'Reference<%s,%s>' % (unicode(self.referencing_paper), unicode(self.referenced_paper))
 
 
 class Bookmark(models.Model):
