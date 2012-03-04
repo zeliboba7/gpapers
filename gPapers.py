@@ -1776,60 +1776,63 @@ class MainGUI:
         except:
             traceback.print_exc()
 
-    def delete_playlist(self, id):
-        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
-        dialog.set_markup('Really delete this document collection?')
+    def delete_object(self, text, obj, update_function):
+        '''
+        Asks for confirmation before deleting an object and calling an update
+        function (e.g. :method:`refresh_left_pane`). Is called by the
+        more specific methods like :method:`delete_playlist` etc.
+        '''
+        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION,
+                                   buttons=Gtk.ButtonsType.YES_NO,
+                                   flags=Gtk.DialogFlags.MODAL)
+        dialog.set_markup(text)
         dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
         dialog.destroy()
         if response == Gtk.ResponseType.YES:
-            Playlist.objects.get(id=id).delete()
-            self.refresh_left_pane()
+            obj.delete()
+            update_function()
+
+    def delete_playlist(self, id):
+        '''
+        Ask for confirmation before deleting a document collection (playlist).
+        '''
+        obj = Playlist.objects.get(id=id)
+        self.delete_object('Really delete this document collection?', obj,
+                           self.refresh_left_pane)
 
     def delete_author(self, id):
-        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
-        dialog.set_markup('Really delete this author?')
-        dialog.set_default_response(Gtk.ResponseType.NO)
-        dialog.show_all()
-        response = dialog.run()
-        dialog.destroy()
-        if response == Gtk.ResponseType.YES:
-            Author.objects.get(id=id).delete()
-            self.refresh_my_library_filter_pane()
+        '''
+        Ask for confirmation before deleting an author.
+        '''
+        obj = Author.objects.get(id=id)
+        self.delete_object('Really delete this author?', obj,
+                           self.refresh_my_library_filter_pane())
 
     def delete_bookmark(self, id):
-        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
-        dialog.set_markup('Really delete this bookmark?')
-        dialog.set_default_response(Gtk.ResponseType.NO)
-        dialog.show_all()
-        response = dialog.run()
-        dialog.destroy()
-        if response == Gtk.ResponseType.YES:
-            Bookmark.objects.get(id=id).delete()
-            self.update_bookmark_pane_from_paper(self.displayed_paper)
+        '''
+        Ask for confirmation before deleting a bookmark.
+        '''
+        obj = Bookmark.objects.get(id=id)
+        self.delete_object('Really delete this bookmark?', obj,
+                           lambda : self.update_bookmark_pane_from_paper(self.displayed_paper))
 
     def delete_source(self, id):
-        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
-        dialog.set_markup('Really delete this source?')
-        dialog.set_default_response(Gtk.ResponseType.NO)
-        dialog.show_all()
-        response = dialog.run()
-        dialog.destroy()
-        if response == Gtk.ResponseType.YES:
-            Source.objects.get(id=id).delete()
-            self.refresh_my_library_filter_pane()
+        '''
+        Ask for confirmation before deleting a source (e.g. a journal)
+        '''
+        obj = Source.objects.get(id=id)
+        self.delete_object('Really delete this source?', obj,
+                           self.refresh_my_library_filter_pane)
 
     def delete_organization(self, id):
-        dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
-        dialog.set_markup('Really delete this organization?')
-        dialog.set_default_response(Gtk.ResponseType.NO)
-        dialog.show_all()
-        response = dialog.run()
-        dialog.destroy()
-        if response == Gtk.ResponseType.YES:
-            Organization.objects.get(id=id).delete()
-            self.refresh_my_library_filter_pane()
+        '''
+        Ask for confirmation before deleting an organization.
+        '''
+        obj = Organization.objects.get(id=id)
+        self.delete_object('Really delete this organization?', obj,
+                           self.refresh_my_library_filter_pane)
 
     def refresh_middle_pane_from_my_library(self, refresh_library_filter_pane=True):
         self.active_threads[ thread.get_ident() ] = 'searching local library...'
