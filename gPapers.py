@@ -1753,7 +1753,7 @@ class MainGUI:
 
     def delete_papers(self, paper_ids):
         papers = Paper.objects.in_bulk(paper_ids).values()
-        paper_list_text = '\n'.join([ ('<i>"%s"</i>' % str(paper.title)) for paper in papers ])
+        paper_list_text = '\n'.join([ ('<i>"%s"</i>' % unicode(paper.title)) for paper in papers ])
         dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
         dialog.set_markup('Really delete the following %s?\n\n%s\n\n' % (humanize_count(len(papers), 'paper', 'papers', places= -1), paper_list_text))
         dialog.set_default_response(Gtk.ResponseType.NO)
@@ -1762,7 +1762,7 @@ class MainGUI:
         dialog.destroy()
         if response == Gtk.ResponseType.YES:
             for paper in papers:
-                log_info('deleting paper: %s' % str(paper))
+                log_info('deleting paper: %s' % unicode(paper))
                 paper.delete()
             self.refresh_middle_pane_search()
 
