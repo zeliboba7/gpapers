@@ -6,8 +6,7 @@ from gi.repository import Soup  # @UnresolvedImport
 from logger import log_debug, log_info, log_error
 from BeautifulSoup import BeautifulStoneSoup
 
-from gPapers.models import *
-from importer import WebSearchProvider, soup_session, update_paper_from_dictionary
+from importer import WebSearchProvider, soup_session
 
 BASE_URL = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
 ESEARCH_QUERY = 'esearch.fcgi?db=pubmed&term=%s&usehistory=y'
@@ -26,6 +25,7 @@ class PubMedSearch(WebSearchProvider):
         WebSearchProvider.__init__(self)
 
     def _ids_received(self, message, callback, error_callback, user_data):
+        message.response_body.flatten()
         if not message.status_code == Soup.KnownStatusCode.OK:
             error_callback('Pubmed replied with error code %d.' % message.status_code, user_data)
         else:
@@ -51,6 +51,7 @@ class PubMedSearch(WebSearchProvider):
             soup_session.queue_message(message, mycallback, user_data)
 
     def _summaries_received(self, message, callback, error_callback, user_data):
+        message.response_body.flatten()
         if not message.status_code == Soup.KnownStatusCode.OK:
             error_callback('Pubmed replied with error code %d.' % message.status_code, user_data)
         else:
@@ -63,7 +64,9 @@ class PubMedSearch(WebSearchProvider):
                 info = {}
                 # Extract information
                 info['pubmed_id'] = str(document.id.string)
-
+                # This is needed for retrieving the paper in
+                # import_paper_after_search
+                info['data'] = info['pubmed_id']
                 doi = document.findAll('item', {'name': 'doi'})
                 if doi:
                     info['doi'] = doi[0].string
@@ -101,12 +104,14 @@ class PubMedSearch(WebSearchProvider):
         def mycallback(session, message, user_data):
             self._ids_received(message, callback, error_callback, user_data)
 
-        soup_session.queue_message(message, mycallback, (self.label, search_text))
+        soup_session.queue_message(message, mycallback, (self.label,
+                                                         search_text))
 
-    def _paper_info_received(self, message, callback, paper, user_data):
+    def _paper_info_received(self, message, callback, user_data):
         if not message.status_code == Soup.KnownStatusCode.OK:
             log_error('Pubmed replied with error code %d for paper_info with id: %s' % \
                       (message.status_code, user_data[1]))
+            paper_info = None
         else:
             parsed_response = BeautifulStoneSoup(message.response_body.data)
             paper_info = {}
@@ -114,12 +119,10 @@ class PubMedSearch(WebSearchProvider):
             try:
                 journal = parsed_response.findAll('journal')[0]
                 paper_info['journal'] = journal.findAll('title')[0].text
-                log_debug('Journal name: %s' % name)
                 try:
                     paper_info['issue'] = journal.findAll('issue')[0].text
                 except:
                     pass
-                log_debug('Journal issue: %s' % issue)
 
                 paper_info['pages'] = parsed_response.findAll('medlinepgn')[0].text
                 log_debug('Pages: %s' % paper_info.source_pages)
@@ -147,20 +150,17 @@ class PubMedSearch(WebSearchProvider):
                 if all_authors:
                     paper_info['authors'] = all_authors
             except Exception as ex:
-                traceback.print_stack()
+                pass
 
-            update_paper_from_dictionary(paper_info, paper)
+        callback(paper_info, None, user_data)
 
-        callback(paper)
-
-    def import_paper_after_search(self, data, paper, callback):
-        assert paper.pubmed_id
-        log_info('Trying to import pubmed citation with id %s' % paper.pubmed_id)
-        query = BASE_URL + EFETCH_QUERY % paper.pubmed_id
+    def import_paper_after_search(self, pubmed_id, callback):
+        log_info('Trying to import pubmed citation with id %s' % pubmed_id)
+        query = BASE_URL + EFETCH_QUERY % pubmed_id
         message = Soup.Message.new(method='GET', uri_string=query)
 
         def mycallback(session, message, user_data):
-            self._paper_info_received(message, callback, paper, user_data)
+            self._paper_info_received(message, callback, user_data)
 
-        soup_session.queue_message(message, mycallback, (self.label,
-                                                         paper.pubmed_id))
+        soup_session.queue_message(message, mycallback,
+                                   (self.label, pubmed_id))
