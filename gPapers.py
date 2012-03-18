@@ -20,9 +20,11 @@
 
 import commands, math, os, sys, thread, threading, time, traceback
 import mimetypes
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from logger import *
+from importer import bibtex
+
 log_level_debug()
 
 RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
@@ -64,6 +66,7 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
 import django.core.management
 django.core.management.setup_environ(settings)
 from django.db.models import Q
+from django.template import defaultfilters
 
 import deseb
 from gPapers.models import *
@@ -280,7 +283,6 @@ def row_from_dictionary(info, provider=None):
     except:
         pass
 
-
     row = (
             info.get('id', -1), # paper id 
             pango_escape(', '.join([author for author in
@@ -304,10 +306,101 @@ def row_from_dictionary(info, provider=None):
     return row
 
 
+def paper_from_dictionary(paper_info, paper=None):
+    '''
+    Adds all information from a `paper_info` dictionary to the given
+    :class:`gPapers.model.Paper` object, creating and saving
+    :class:`gPapers.model.Author` and :class:`gPapers.model.Source` objects
+    if necessary.
+
+    Returns the `paper` object.
+    '''
+
+    log_debug('paper_from_dictionary received: %s' % str(paper_info))
+
+    if paper is None:
+        paper = Paper.objects.create()
+    if paper_info is None:
+        paper_info = {}
+
+    # Journal
+    if 'journal' in paper_info:
+        #TODO: Volume etc
+        if 'issue' in paper_info:
+            source, created = Source.objects.get_or_create(name=paper_info['journal'],
+                                                           issue=paper_info['issue'])
+        else:
+            source, created = Source.objects.get_or_create(name=paper_info['journal'])
+
+        paper.source = source
+
+        if 'year' in paper_info:
+            paper.source.publication_date = date(int(paper_info['year']), 1, 1)
+
+        paper.source.location = paper_info.get('location', '')
+        paper.source.save()
+
+    if 'pages' in paper_info:
+        paper.source_pages = paper_info['pages']
+
+    # Authors
+    if 'authors' in paper_info:
+        for author in paper_info['authors']:
+            author_obj, created = Author.objects.get_or_create(name=author)
+            paper.authors.add(author_obj)
+            if created:
+                author_obj.save()
+
+    # Simple attributes
+    attributes = ['title', 'abstract', 'doi']
+
+    for attr in attributes:
+        log_debug('Checking if %s is in paper_info' % attr)
+        if attr in paper_info:
+            log_debug('%s is in paper_info' % attr)
+            paper.__setattr__(attr, paper_info[attr])
+
+    paper.save()
+
+    return paper
+
+
 class MainGUI:
 
     current_middle_top_pane_refresh_thread_ident = None
     active_threads = {}
+
+    def document_imported(self, paper_info, paper_data, user_data):
+        '''
+        Should be called after a paper is imported. `paper_info` is a
+        dictionary with document metadata, `paper_data` is the PDF itself.
+        '''
+
+        if user_data in importer.active_threads:
+            del importer.active_threads[user_data]
+
+        if paper_data is None and paper_info is None:
+            # FIXME: This should be handled via an error callback
+            return
+
+        log_debug('Calling paper_from_dictionary for %s' % str(paper_info))
+        paper = paper_from_dictionary(paper_info)
+        log_debug('paper_from_dictionary returned %s' % str(paper))
+        if paper_data is not None:
+            #TODO: What is a good filename? Make this configurable?
+            if paper.doi:
+                filename = 'doi_' + paper.doi
+            elif paper.pubmed_id:
+                filename = 'pubmed_' + paper.pubmed_id
+            else:
+                filename = 'internal_id_' + str(paper.id)
+
+            filename = defaultfilters.slugify(filename) + '.pdf'
+            log_debug('Saving paper to "%s"' % filename)
+            paper.save_file(filename, paper_data)
+            log_debug('Paper saved')
+
+        self.refresh_middle_pane_from_my_library()
 
     def import_url_dialog(self, o):
         '''
@@ -328,9 +421,9 @@ class MainGUI:
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             url = entry.get_text()
-            threading.Thread(target=importer.import_citation,
-                             args=(url, None,
-                                   main_gui.refresh_middle_pane_search)).start()
+            importer.active_threads[url] = 'Importing URL'
+            importer.import_from_url(url, self.document_imported)
+
         dialog.destroy()
 
     def import_doi_dialog(self, o):
@@ -344,7 +437,8 @@ class MainGUI:
                                    buttons=Gtk.ButtonsType.OK_CANCEL,
                                    flags=Gtk.DialogFlags.MODAL)
         #dialog.connect('response', lambda x,y: dialog.destroy())
-        dialog.set_markup('<b>Import via DOI...</b>\n\nEnter the DOI name (e.g., 10.1000/182) you would like to import:')
+        dialog.set_markup('<b>Import via DOI...</b>\n\nEnter the DOI name '
+                          '(e.g., 10.1000/182) you would like to import:')
         entry = Gtk.Entry()
         entry.set_activates_default(True)
         dialog.vbox.add(entry)
@@ -353,9 +447,9 @@ class MainGUI:
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             url = 'http://dx.doi.org/' + entry.get_text().strip()
-            threading.Thread(target=importer.import_citation,
-                             args=(url, None,
-                                   main_gui.refresh_middle_pane_search)).start()
+            importer.active_threads[url] = 'Importing DOI'
+            importer.import_from_url(url, self.document_imported)
+
         dialog.destroy()
 
     def import_file_dialog(self, o):
@@ -421,11 +515,25 @@ class MainGUI:
         dialog.show_all()
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
+
             text_buffer = entry.get_buffer()
-            bibtex = text_buffer.get_text(text_buffer.get_start_iter(),
-                                          text_buffer.get_end_iter())
-            threading.Thread(target=import_citations_via_bibtexs,
-                             args=(bibtex,)).start()
+            bibtex_data = text_buffer.get_text(text_buffer.get_start_iter(),
+                                          text_buffer.get_end_iter(), False)
+            paper_info = bibtex.paper_info_from_bibtex(bibtex_data)
+
+            url = paper_info.get('import_url')
+            if not url:
+                url = paper_info.get('doi')
+                if url:
+                    url = 'http://dx.doi.org/' + url
+
+            if url:
+                importer.import_from_url(url, self.document_imported,
+                                         paper_info=paper_info)
+            else:
+                self.document_imported(paper_info, paper_data=None,
+                                       user_data=None)
+
         dialog.destroy()
 
     def __init__(self):
@@ -462,7 +570,7 @@ class MainGUI:
 
         treeview_running_tasks = self.ui.get_object('treeview_running_tasks')
         # thread_id, text
-        self.treeview_running_tasks_model = Gtk.ListStore(int, str)
+        self.treeview_running_tasks_model = Gtk.ListStore(str, str)
         treeview_running_tasks.set_model(self.treeview_running_tasks_model)
 
         renderer = Gtk.CellRendererText()
@@ -475,24 +583,26 @@ class MainGUI:
         thread.start_new_thread(self.watch_busy_notifier, ())
 
     def watch_busy_notifier(self):
-        while True:
-            try:
-                if len(self.active_threads):
-                    self.treeview_running_tasks_model.clear()
-                    for x in self.active_threads.items():
-                        self.treeview_running_tasks_model.append(x)
-                    if not self.busy_notifier_is_running:
-                        self.ui.get_object('busy_notifier').set_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'process-working.gif'))
-                        self.busy_notifier_is_running = True
-                        self.ui.get_object('treeview_running_tasks').show()
-                else:
-                    if self.busy_notifier_is_running:
-                        self.ui.get_object('busy_notifier').set_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'blank.gif'))
-                        self.busy_notifier_is_running = False
-                        self.ui.get_object('treeview_running_tasks').hide()
-            except:
-                traceback.print_exc()
-            time.sleep(1)
+        pass
+        # FIXME
+#        while True:
+#            try:
+#                if len(self.active_threads):
+#                    self.treeview_running_tasks_model.clear()
+#                    for x in self.active_threads.items():
+#                        self.treeview_running_tasks_model.append(x)
+#                    if not self.busy_notifier_is_running:
+#                        self.ui.get_object('busy_notifier').set_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'process-working.gif'))
+#                        self.busy_notifier_is_running = True
+#                        self.ui.get_object('treeview_running_tasks').show()
+#                else:
+#                    if self.busy_notifier_is_running:
+#                        self.ui.get_object('busy_notifier').set_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'blank.gif'))
+#                        self.busy_notifier_is_running = False
+#                        self.ui.get_object('treeview_running_tasks').hide()
+#            except:
+#                traceback.print_exc()
+#            time.sleep(1)
 
 
     def init_menu(self):
@@ -823,7 +933,14 @@ class MainGUI:
 
         self.source_filter_model.clear()
         for source in Source.objects.order_by('name'):
-            self.source_filter_model.append((source.id, source.name, source.issue, source.location, source.publisher, source.publication_date))
+            if source.publication_date:
+                publication_date = source.publication_date.strftime('%Y-%m-%d')
+            else:
+                publication_date = ''
+            self.source_filter_model.append((source.id, source.name,
+                                             source.issue, source.location,
+                                             source.publisher,
+                                             publication_date))
 
 
     def init_bookmark_pane(self):
@@ -1459,18 +1576,27 @@ class MainGUI:
                 log_debug('URL or DOI exists')
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_HOME)
                 button.set_tooltip_text('Open this URL in your browser...')
-                button.connect('clicked', lambda x: desktop.open(liststore[rows[0]][8]))
+                url = liststore[rows[0]][8]
+                if not url:
+                    url = 'http://dx.doi.org/' + liststore[rows[0]][9]
+                button.connect('clicked', lambda x: desktop.open(url))
                 paper_information_toolbar.insert(button, -1)
                 if paper:
                     button = Gtk.ToolButton(stock_id=Gtk.STOCK_REFRESH)
                     button.set_tooltip_text('Re-add this paper to your library...')
                     button.connect('clicked', lambda x: fetch_citation_via_middle_top_pane_row(liststore[rows[0]]))
                     paper_information_toolbar.insert(button, -1)
-                else:
-                    button = Gtk.ToolButton(stock_id=Gtk.STOCK_ADD)
-                    button.set_tooltip_text('Add this paper to your library...')
-                    button.connect('clicked', lambda x: fetch_citation_via_middle_top_pane_row(liststore[rows[0]]))
-                    paper_information_toolbar.insert(button, -1)
+
+            source = liststore[rows[0]][15]
+            log_debug('Source: %s' % source)
+            if not paper and source != 'local':  # This is a search result
+                button = Gtk.ToolButton(stock_id=Gtk.STOCK_ADD)
+                button.set_tooltip_text('Add this paper to your library...')
+                provider = self.search_providers[source]
+                button.connect('clicked',
+                               lambda x: provider.import_paper_after_search(liststore[rows[0]][14],
+                                                                            self.document_imported))
+                paper_information_toolbar.insert(button, -1)
 
             if paper:
                 importable_references = set()
@@ -1885,7 +2011,7 @@ class MainGUI:
 
                     filter_liststore, filter_rows = self.ui.get_object('source_filter').get_selection().get_selected_rows()
                     q = None
-                    for row in filter_rows:
+                    for treepath in filter_rows:
                         row = filter_liststore[treepath]
                         if q == None: q = Q(source__id=row[0])
                         else: q = q | Q(source__id=row[0])
@@ -1893,7 +2019,7 @@ class MainGUI:
 
                     filter_liststore, filter_rows = self.ui.get_object('organization_filter').get_selection().get_selected_rows()
                     q = None
-                    for row in filter_rows:
+                    for treepath in filter_rows:
                         row = filter_liststore[treepath]
                         if q == None: q = Q(organizations__id=row[0])
                         else: q = q | Q(organizations__id=row[0])
@@ -1922,7 +2048,7 @@ class MainGUI:
                 if paper.source:
                     journal = paper.source.name
                     if paper.source.publication_date:
-                        pub_year = paper.source.publication_date.year
+                        pub_year = str(paper.source.publication_date.year)
                     else:
                         pub_year = ''
                 else:
@@ -2013,7 +2139,7 @@ class MainGUI:
                 pass
 
             # Add information to table 
-            rows.append(row_from_dictionary(info, search_provider))
+            rows.append(row_from_dictionary(info, search_provider.label))
 
         self.middle_top_pane_model.clear()
         for row in rows:
@@ -2682,6 +2808,7 @@ def init_db():
 
 if __name__ == "__main__":
 
+    Gtk.init(sys.argv)
     MEDIA_ROOT = settings.MEDIA_ROOT
 
     log_info('using database at %s' % MEDIA_ROOT)

@@ -7,7 +7,8 @@ from django.template import defaultfilters
 
 import openanything
 from logger import log_debug, log_info, log_error
-from importer import *
+from bibtex import paper_info_from_bibtex
+from importer import SimpleWebSearchProvider, html_strip, soup_session
 
 BASE_URL = 'http://scholar.google.com/'
 
@@ -96,14 +97,18 @@ class GoogleScholarSearch(SimpleWebSearchProvider):
 
         return papers
 
-    def _got_bibtex(self, message, paper, callback):
+    def _got_bibtex(self, message, callback, user_data):
         if message.status_code == Soup.KnownStatusCode.OK:
-            paper = update_paper_from_bibtex_html(paper,
-                                                  message.request_body.data)
-        callback(paper)
+            bibtex_data = message.request_body.data
+            log_debug('Received BibTeX data:\n%s' % bibtex_data)
+            paper_info = paper_info_from_bibtex(bibtex_data)
+        else:
+            log_error('google scholar got status code %d' % message.status_code)
+            paper_info = None
+        callback(paper_info, None, user_data)
 
-    def import_paper_after_search(self, data, paper, callback):
-        log_info('Trying to import google scholar citation "%s"' % paper.title)
+    def import_paper_after_search(self, data, callback):
+        log_info('Trying to import google scholar citation')
         try:
             citations = data.findAll('div', {'class': 'gs_fl'})[0]
             log_debug('Citations: %s' % str(citations))
@@ -113,16 +118,15 @@ class GoogleScholarSearch(SimpleWebSearchProvider):
                     log_debug('Found BibTex link: %s' % link['href'])
 
                     def bibtex_callback(session, message, user_data):
-                        self._got_bibtex(message, paper, callback)
+                        self._got_bibtex(message, callback, user_data)
 
                     message = Soup.Message.new(method='GET',
                                                uri_string=BASE_URL + link['href'])
-                    soup_session.queue_message(message, bibtex_callback, None)
-
-                    return
-            link = data.findAll('div', {'class': 'gs_ggs gs_fl'})[0]
-            find_and_attach_pdf(paper, urls=[x['href'] for x in link.findAll('a') ])
-
-            return paper
+                    message.request_headers.append('Cookie',
+                                       'GSP=ID=%s:CF=4' % self.google_id)
+                    soup_session.queue_message(message, bibtex_callback,
+                                               self.label)
+                    #FIXME: Google scholar does not always seem to include the
+                    #       URL in the bibtex data -- in this case add a link
         except:
             traceback.print_exc()

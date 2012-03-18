@@ -1,6 +1,6 @@
 from gi.repository import Soup
 from BeautifulSoup import BeautifulStoneSoup
-from importer import SimpleWebSearchProvider, update_paper_from_dictionary
+from importer import SimpleWebSearchProvider
 from gPapers.models import Paper
 
 from logger import *
@@ -84,9 +84,7 @@ class JSTORSearch(SimpleWebSearchProvider):
 
         return papers
 
-    def fill_in_paper_info(self, data, paper=None):
-        if not paper:
-            paper = Paper()
+    def fill_in_paper_info(self, data):
         paper_info = self._parse_result(data)
 
-        return update_paper_from_dictionary(paper_info, paper)
+        return paper_info

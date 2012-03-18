@@ -15,11 +15,12 @@
 #    with this program; if not, write to the Free Software Foundation, Inc.,
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import md5, os, re, traceback
+import hashlib, os, re, traceback
 from django.db import models
 import django.core.files.base
 import desktop, pyPdf
 
+from logger import log_debug
 
 p_doi = re.compile('doi *: *(10.[a-z0-9]+/[a-z0-9.]+)', re.IGNORECASE)
 
@@ -158,10 +159,14 @@ class Paper(models.Model):
     updated = models.DateTimeField(auto_now=True)
 
     def save_file(self, filename, raw_contents, save=True):
-        m = md5.new()
-        m.update(raw_contents)
-        self.full_text_md5 = m.hexdigest()
-        self.full_text.save(filename, django.core.files.base.ContentFile(raw_contents), save)
+        log_debug('Generating md5 sum')
+        self.full_text_md5 = hashlib.md5(raw_contents).hexdigest()
+        log_debug('Saving file content')
+        self.full_text.save(filename,
+                            django.core.files.base.ContentFile(raw_contents),
+                            save)
+        self.save()
+        log_debug('Extracting information from PDF')
         try: self.extract_document_information_from_pdf()
         except: traceback.print_exc()
 

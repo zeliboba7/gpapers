@@ -23,6 +23,7 @@ import urllib, urlparse
 
 import gi
 from gi.repository import GObject
+from gi.repository import Gio
 from gi.repository import Gdk
 from gi.repository import Gtk
 from gi.repository import Pango
@@ -30,40 +31,19 @@ from gi.repository import Soup
 
 from pyPdf import PdfFileReader
 
-from gPapers.models import *
+#from gPapers.models import *
 from django.template import defaultfilters
 import BeautifulSoup, openanything
 
 from logger import *
+import bibtex
 
 active_threads = None
 
-p_bibtex = re.compile('[@][a-z]+[\s]*{([^<]*)}', re.IGNORECASE | re.DOTALL)
 p_whitespace = re.compile('[\s]+')
 p_doi = re.compile('doi *: *(10.[a-z0-9]+/[a-z0-9.]+)', re.IGNORECASE)
 
 soup_session = Soup.SessionAsync()
-
-
-def latex2unicode(s):
-    """
-    *  \`{o} produces a grave accent
-    * \'{o} produces an acute accent
-    * \^{o} produces a circumflex
-    * \"{o} produces an umlaut or dieresis
-    * \H{o} produces a long Hungarian umlaut
-    * \~{o} produces a tilde
-    * \c{c} produces a cedilla
-    * \={o} produces a macron accent (a bar over the letter)
-    * \b{o} produces a bar under the letter
-    * \.{o} produces a dot over the letter
-    * \d{o} produces a dot under the letter
-    * \u{o} produces a breve over the letter
-    * \v{o} produces a "v" over the letter
-    * \t{oo} produces a "tie" (inverted u) over the two letters
-    """
-    # TODO: expand this to really work
-    return s.replace('\c{s}', u's')
 
 
 def _decode_htmlentities(string):
@@ -277,7 +257,8 @@ def import_citation(url, paper=None, callback=None):
                 #That didn't work, try to find a filename in the query string
                 query = urlparse.parse_qs(parsed_url.query)
                 for key in query:
-                    if os.path.splitext(query[key])[1].lower() == '.pdf':
+                    print key, query[key]
+                    if os.path.splitext(query[key][0])[1].lower() == '.pdf':
                         filename = query[key].lower() # found a .pdf name
                         break
 
@@ -454,53 +435,200 @@ def find_and_attach_pdf(paper, urls, visited_urls=set()):
                 if find_and_attach_pdf(paper, list(promising_links), visited_urls=visited_urls): return
 
 
-def update_paper_from_dictionary(paper_info, paper):
+def determine_content_type(filename):
     '''
-    Adds all information from a `paper_info` dictionary to the given
-    :class:`gPapers.model.Paper` object, creating and saving 
-    :class:`gPapers.model.Author` and :class:`gPapers.model.Source` objects
-    if necessary.
-    
-    Returns the `paper` object.
+    Determines the content type for a file. Returns either a string like
+    'application/pdf' or None if the type could not be determined. For files
+    with a file extension, this function normally does only look at the
+    filename, but if this is not sufficient for determining the content-type,
+    the file can also be opened.
     '''
-    assert paper is not None
-    # Journal
-    if 'journal' in paper_info:
-        #TODO: Volume etc
-        if 'issue' in paper_info:
-            source, created = Source.objects.get_or_create(name=paper_info['journal'],
-                                                           issue=paper_info['issue'])
+
+    # Try the fast content type first
+    gfile = Gio.file_new_for_path(filename)
+    info = gfile.query_info(Gio.FILE_ATTRIBUTE_STANDARD_FAST_CONTENT_TYPE,
+                            Gio.FileQueryInfoFlags.NONE, None)
+    content_type = info.get_attribute_as_string(Gio.FILE_ATTRIBUTE_STANDARD_FAST_CONTENT_TYPE)
+
+    # If that did not work, try the full content-type determination
+    if Gio.content_type_is_unknown(content_type):
+        info = gfile.query_info(Gio.FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE,
+                                Gio.FileQueryInfoFlags.NONE, None)
+        content_type = info.get_attribute_as_string(Gio.FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE)
+
+    if Gio.content_type_is_unknown(content_type):
+        content_type = None
+
+    return content_type
+
+
+def import_from_url(url, callback, paper_info=None, paper_data=None):
+    '''
+    Searches the given url (asynchronously) for a PDF and/or metadata
+    (currently it will only look for BibTeX data). If the URL is a standard
+    HTML page, it will be searched for potential links, then 
+    :function:`import_from_urls` will be called with this link. Finally, the
+    callback is called with the `paper_info` (a dictionary) and `paper_data`
+    (binary data)
+    as an argument.
+    '''
+
+    def data_received(session, message, user_data):
+        if not message.status_code == Soup.KnownStatusCode.OK:
+            # FIXME: Use error handler here
+            log_warn('URL %s responded with error code %d' % (user_data,
+                                                              message.status_code))
+            callback(None, None, user_data)
+            return
+
+        content_type = message.response_headers.get_content_type()[0]
+        orig_url = message.get_uri().to_string(False)
+
+        if message.response_body.data:
+            # Heuristic: BibTeX data starts with a @
+            first_letter = message.response_body.data.strip()[0]
+            data = message.response_body.flatten().data
         else:
-            source, created = Source.objects.get_or_create(name=paper_info['journal'])
-        if created:
-            source.save()
-        paper.source = source
+            first_letter = None
+            data = None
 
-    if 'pages' in paper_info:
-        paper.source_pages = paper_info['pages']
+        log_debug('Received content type %s for URI %s' % (content_type,
+                                                           message.get_uri()))
 
-    # Authors
-    if 'authors' in paper_info:
-        for author in paper_info['authors']:
-            author_obj, created = Author.objects.get_or_create(name=author)
-            paper.authors.add(author_obj)
-            if created:
-                author_obj.save()
-    # Simple attributes
-    attributes = ['title', 'abstract', 'year']
+        if content_type == 'application/pdf':
+            callback(None, data, user_data)
+        elif (content_type == 'text/x-bibtex' or first_letter == '@') and paper_info is None:
+            paper_info = {'bibtex': data}
+            callback(paper_info, None, user_data)
+        elif content_type == 'text/html':
+            log_debug('Searching page for links')
+            parsed = BeautifulSoup.BeautifulSoup(data)
 
-    for attr in attributes:
-        if attr in paper_info:
-            paper.__setattr__(attr, paper_info[attr])
+            # Check all links
+            urls = []
+            for a in parsed.findAll('a'):
+                if not a.has_key('href'):
+                    continue
+                href = a['href']
+                if href.lower() == orig_url.lower(): #this is were we came from...
+                    continue
 
-    paper.save()
-    return paper
+                # Check for PDF links
+                if href.lower().endswith('.pdf'):
+                    urls.append(href)
+                    log_debug('found potential PDF link: %s' % href)
+                else:
+                    for c in a.contents:
+                        c = str(c).lower()
+                        if 'pdf' in c:
+                            urls.append(href)
+                            log_debug('found potential PDF link: %s' % href)
+                            break
+
+                # Check for BibTeX links
+                if href.lower().endswith('.bib'):
+                    urls.append(href)
+                    log_debug('found potential BibTeX link: %s' % href)
+                else:
+                    for c in a.contents:
+                        c = str(c).lower()
+                        if 'bibtex' in c:
+                            urls.append(href)
+                            log_debug('found potential BibTeX link: %s' % href)
+                            break
+            if urls:  # we found at least something...
+                #Combine the base URL with the PDF link (necessary for relative URLs)
+                urls = [urlparse.urljoin(orig_url, url) for url in urls]
+                log_debug('Calling import_from_urls with %s' % str(urls))
+                import_from_urls(urls, callback, user_data)
+            else:
+                log_warn('Nothing found...')
+                callback(paper_info, paper_data, user_data)
+        else:
+            log_warn('Do not know what to do with content type %s of URL %s' % (content_type, orig_url))
+            callback(paper_info, paper_data, user_data)
+
+    try:
+        message = Soup.Message.new(method='GET', uri_string=url)
+    except TypeError:
+        message = None
+
+    if message:
+        soup_session.queue_message(message, data_received, url)
+    else:
+        callback(paper_info, paper_data, url)
+
+
+def _import_from_urls(urls, callback, user_data, paper_info=None, paper_data=None):
+    '''
+    Searches the given urls (asynchronously) for a PDF and/or metadata
+    (currently it will only look for BibTeX data). When either all URLs have
+    been searched or both metadata and PDF have been found, the callback is 
+    called with the `paper_info` (a dictionary) and `paper_data` (binary data)
+    as an argument.
+    '''
+    log_debug('_import_from_urls')
+    if not urls or (paper_info and paper_data):
+        callback(paper_info, paper_data, user_data)
+        return
+
+    url = urls.pop()
+
+    def data_received(session, message, user_data):
+        content_type = message.response_headers.get_one('content-type')
+        if message.response_body.data:
+            # Heuristic: BibTeX data starts with a @
+            first_letter = message.response_body.data.strip()[0]
+            log_debug('First letter of Body is: %s' % first_letter)
+            data = bytearray(message.response_body.flatten().data)
+        else:
+            first_letter = None
+            data = None
+        log_debug('Received content type %s for URI %s' % (content_type,
+                                                           message.get_uri()))
+
+        if content_type == 'application/pdf' and not paper_data:
+            _import_from_urls(urls, callback, user_data, paper_info=paper_info,
+                              paper_data=data)
+        elif (content_type == 'text/x-bibtex' or first_letter == '@') and not paper_info:
+            # TODO: Convert bibtex data
+            new_paper_info = bibtex.paper_info_from_bibtex(data)
+            _import_from_urls(urls, callback, user_data, paper_info=new_paper_info,
+                              paper_data=paper_data)
+        else: # Continue searching for usable data
+            _import_from_urls(urls, callback, user_data, paper_info=paper_info,
+                              paper_data=paper_data)
+
+    message = Soup.Message.new(method='GET', uri_string=url)
+    soup_session.queue_message(message, data_received, user_data)
+
+
+def import_from_urls(urls, callback, user_data):
+    '''
+    Searches the given urls (asynchronously) for a PDF and/or metadata
+    (currently it will only look for BibTeX data). When either all URLs have
+    been searched or both metadata and PDF have been found, the callback is 
+    called with the `paper_info` (a dictionary) and `paper_data` (binary data)
+    as an argument.
+    '''
+    if urls is None:
+        callback(None, None, user_data)
+
+    log_info(('Starting to look for PDF and/or metadata '
+             'from %d possible URLs' % len(urls)))
+
+    def _import_from_urls_finished(paper_info, paper_data, user_data):
+        log_debug('_import_from_urls_finished')
+        callback(paper_info, paper_data, user_data)
+
+    _import_from_urls(urls, _import_from_urls_finished, user_data)
+
 
 class WebSearchProvider(object):
     '''
     Base class for all web search providers, i.e. websites or web APIs that 
     return a number of search results for a search string.
-    
+
     Implementation of new search providers should derive from this class and
     have to provide the following attributes as class attributes:
     * `name`: A human readable name that is used in the left column of the GUI,
@@ -533,7 +661,7 @@ class WebSearchProvider(object):
     paper) as opposed to only the extracted information.
     This method should not block but use the :class:`AsyncSoupSession` object
     `importer.soup_session` for getting the information. 
-        
+
     * `import_paper_after_search(self, data, paper, callback, error_callback)`
     This method receives the `data` (if any) previously returned from the
     :method:`parse_website_response` method and a :class:`Paper` object, already
@@ -547,7 +675,7 @@ class WebSearchProvider(object):
     URL strings can be given as the second argument, these URLs will be used 
     in the order they are given, i.e. if fetching the document from the first
     one is not successful, the second one will be tried etc. 
-    
+
     The :method:`__init__` method of the subclass has to call the 
     :method:`__init__` method of the superclass.   
     '''
@@ -590,7 +718,7 @@ class SimpleWebSearchProvider(WebSearchProvider):
     Convenience class for web searches that do a single request to a website for
     a search and do not have to perform additional web requests to get more 
     detailed info for a paper chosen for import.
-    
+
     Such web search providers need only provide three functions:
     * prepare_search_message 
     * parse_response
@@ -612,7 +740,8 @@ class SimpleWebSearchProvider(WebSearchProvider):
 
             # Provide a tuple of label and search string as `user_data` to the
             # callback -- this way it is clear to what search a result/error belongs
-            soup_session.queue_message(message, my_callback, (self.label, search_string))
+            soup_session.queue_message(message, my_callback, (self.label,
+                                                              search_string))
         except Exception as ex:
             error_callback(ex, search_string)
 
@@ -624,44 +753,38 @@ class SimpleWebSearchProvider(WebSearchProvider):
         log_info('Received a response for %s' % str(user_data))
         if message.status_code == Soup.KnownStatusCode.OK:
             #try:
-                callback(user_data, self.parse_response(message.response_body.data))
+                callback(user_data,
+                         self.parse_response(message.response_body.data))
             #except Exception as ex:
             #    error_callback(ex, user_data)
         else:
             error_callback(message.status_code, user_data)
 
-    def import_paper_after_search(self, data, paper, callback):
+    def import_paper_after_search(self, data, callback):
         try:
-            callback(self.fill_in_paper_info(data, paper))
+            callback(self.fill_in_paper_info(data), None, self.label)
         except Exception as ex:
             log_error(str(ex))
 
-    # --------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # Methods to overwrite in sub classes
-    # --------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def prepare_search_message(self, search_string):
         raise NotImplementedError()
 
     def parse_response(self, response):
         raise NotImplementedError()
 
-    def fill_in_paper_info(self, data, paper=None):
+    def fill_in_paper_info(self, data):
         raise NotImplementedError()
 
+if __name__ == '__main__':
+    log_level_debug()
 
-class WebRessourceProvider(object):
-    '''
-    In addition to searching, a :class:`WebRessourceProvider` can provide
-    information about a single paper, e.g. a PubMED provider can 
-    provide paper data given a PubMED ID. A method gives information about its
-    capabilities:
-    * `provides_infos_for_attribute(self, attribute)`
-    `attribute` is a string like 'pubmed_id'
-    
-    If the class return True for any attribute in the previous method (otherwise
-    the class is pretty useless...), it has to provide another method:
-    * `get_infos_for_attribute(self, paper, attribute, value, callback, error_callback)`        
-    '''
+    def print_all(paper_info, paper_data):
+        print 'paper_info', paper_info
+        print 'paper_data', len(paper_data)
+        Gtk.main_quit()
 
-    def provides_infos_for_attribute(self, attribute):
-        return False
+    import_from_url('http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0020409', print_all)
+    Gtk.main()
