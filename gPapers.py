@@ -2269,7 +2269,9 @@ class AuthorEditGUI:
     def save(self):
         self.author.name = self.ui.get_object('entry_name').get_text()
         text_buffer = self.ui.get_object('notes').get_buffer()
-        self.author.notes = text_buffer.get_text(text_buffer.get_start_iter(), text_buffer.get_end_iter())
+        self.author.notes = text_buffer.get_text(text_buffer.get_start_iter(),
+                                                 text_buffer.get_end_iter(),
+                                                 False)
         self.author.rating = round(self.ui.get_object('rating').get_value())
         self.author.save()
         org_ids = set()
@@ -2680,13 +2682,18 @@ class PaperEditGUI:
         self.paper.doi = self.ui.get_object('entry_doi').get_text()
         self.paper.import_url = self.ui.get_object('entry_import_url').get_text()
         text_buffer = self.ui.get_object('textview_abstract').get_buffer()
-        self.paper.abstract = text_buffer.get_text(text_buffer.get_start_iter(), text_buffer.get_end_iter())
+        self.paper.abstract = text_buffer.get_text(text_buffer.get_start_iter(),
+                                                   text_buffer.get_end_iter(),
+                                                   False)
         text_buffer = self.ui.get_object('textview_bibtex').get_buffer()
-        self.paper.bibtex = text_buffer.get_text(text_buffer.get_start_iter(), text_buffer.get_end_iter())
+        self.paper.bibtex = text_buffer.get_text(text_buffer.get_start_iter(),
+                                                 text_buffer.get_end_iter(),
+                                                 False)
         self.paper.rating = round(self.ui.get_object('rating').get_value())
         self.paper.read_count = self.ui.get_object('spinbutton_read_count').get_value()
         new_file_name = self.ui.get_object('filechooserbutton').get_filename()
-        if new_file_name and self.paper.full_text and new_file_name != self.paper.full_text.path:
+        if new_file_name and (not self.paper.full_text or
+                              new_file_name != self.paper.full_text.path):
             try:
                 ext = new_file_name[ new_file_name.rfind('.') + 1: ]
             except:
@@ -2695,7 +2702,9 @@ class PaperEditGUI:
             self.paper.save_file(full_text_filename, open(new_file_name, 'r').read())
 
         self.paper.authors.clear()
-        self.authors_model.foreach(lambda model, path, iter: self.paper.authors.add(Author.objects.get(id=model.get_value(iter, 0))))
+
+        for row in self.authors_model:
+            self.paper.authors.add(Author.objects.get(id=row[0]))
 
         self.paper.save()
         self.edit_dialog.destroy()
