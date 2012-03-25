@@ -192,28 +192,6 @@ def import_documents_via_filenames(filenames):
 
     main_gui.refresh_middle_pane_search()
 
-def import_citations_via_bibtexs(bibtexs):
-
-    log_info('Starting BibTex import')
-
-    a_bibtex = []
-
-    for line in bibtexs.split('\n'):
-        if not line: continue
-        if len(a_bibtex) and line.strip().startswith('@'):
-            # found new bibtex start
-            import_citation_via_bibtex('\n'.join(a_bibtex))
-            a_bibtex = []
-        a_bibtex.append(line)
-    if len(a_bibtex):
-        # import last found bibtex
-        import_citation_via_bibtex('\n'.join(a_bibtex))
-
-    main_gui.refresh_middle_pane_search()
-
-def import_citation_via_bibtex(bibtex):
-    importer.update_paper_from_bibtex_html(None, bibtex)
-
 def paper_info_received(paper):
     paper.save()
     importer.import_citation(paper.import_url, paper=paper,
