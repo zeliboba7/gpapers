@@ -67,6 +67,8 @@ import django.core.management
 django.core.management.setup_environ(settings)
 from django.db.models import Q
 from django.template import defaultfilters
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
 
 import deseb
 from gPapers.models import *
@@ -561,6 +563,11 @@ class MainGUI:
         self.init_bookmark_pane()
         self.init_pdf_preview_pane()
         self.refresh_left_pane()
+        # make sure the GUI updates on database changes
+        def receiver_wrapper(sender, **kwargs):
+            self.handle_library_updates()
+        post_save.connect(receiver_wrapper, sender=Paper, weak=False)
+        post_delete.connect(receiver_wrapper, sender=Paper, weak=False)
         self.main_window.show()
 
     def init_busy_notifier(self):
@@ -1000,6 +1007,14 @@ class MainGUI:
         if width == None:
             width = treeview.get_column(1).get_width() - 16
         treeview.get_column(1).get_cells()[0].set_property('wrap-width', width)
+
+    def handle_library_updates(self):
+        selection = self.ui.get_object('left_pane_selection')
+        liststore, row = selection.get_selected()
+        if liststore[row][4] == 'local':
+            # Re-select to force a refresh
+            self.select_left_pane_item(self.ui.get_object('left_pane_selection'))
+            self.refresh_my_library_count()
 
     def refresh_left_pane(self):
         # FIXME: These should not be loaded again and again
