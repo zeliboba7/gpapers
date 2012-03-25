@@ -379,7 +379,7 @@ class MainGUI:
         '''
 
         if user_data in importer.active_threads:
-            del importer.active_threads[user_data]
+            del importer.active_threads[str(user_data)]
 
         if paper_data is None and paper_info is None:
             # FIXME: This should be handled via an error callback
@@ -587,30 +587,25 @@ class MainGUI:
         treeview_running_tasks.append_column(column)
         make_all_columns_resizeable_clickable_ellipsize(treeview_running_tasks.get_columns())
 
-        thread.start_new_thread(self.watch_busy_notifier, ())
+        GObject.timeout_add_seconds(1, self.watch_busy_notifier)
 
     def watch_busy_notifier(self):
-        pass
-        # FIXME
-#        while True:
-#            try:
-#                if len(self.active_threads):
-#                    self.treeview_running_tasks_model.clear()
-#                    for x in self.active_threads.items():
-#                        self.treeview_running_tasks_model.append(x)
-#                    if not self.busy_notifier_is_running:
-#                        self.ui.get_object('busy_notifier').set_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'process-working.gif'))
-#                        self.busy_notifier_is_running = True
-#                        self.ui.get_object('treeview_running_tasks').show()
-#                else:
-#                    if self.busy_notifier_is_running:
-#                        self.ui.get_object('busy_notifier').set_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'blank.gif'))
-#                        self.busy_notifier_is_running = False
-#                        self.ui.get_object('treeview_running_tasks').hide()
-#            except:
-#                traceback.print_exc()
-#            time.sleep(1)
+        if len(self.active_threads):
+            self.treeview_running_tasks_model.clear()
+            for x in self.active_threads.items():
+                self.treeview_running_tasks_model.append(x)
+            if not self.busy_notifier_is_running:
+                self.ui.get_object('busy_notifier').set_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'process-working.gif'))
+                self.busy_notifier_is_running = True
+                self.ui.get_object('treeview_running_tasks').show()
+        else:
+            if self.busy_notifier_is_running:
+                self.ui.get_object('busy_notifier').set_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'blank.gif'))
+                self.busy_notifier_is_running = False
+                self.ui.get_object('treeview_running_tasks').hide()
 
+        # Assure that this function gets called again
+        return True
 
     def init_menu(self):
         self.ui.get_object('menuitem_quit').connect('activate', lambda x: sys.exit(0))
@@ -642,24 +637,6 @@ class MainGUI:
         about.set_authors(['Derek Anderson', 'http://kered.org'])
         about.connect('response', lambda x, y: about.destroy())
         about.show()
-
-    def check_for_updates(self):
-        parent_self = self
-        class UpdateThread(threading.Thread):
-            def run(self):
-                parent_self.active_threads[ thread.get_ident() ] = 'checking for updates...'
-                output = commands.getoutput('svn update')
-                Gdk.threads_enter()
-                dialog = Gtk.MessageDialog(type=Gtk.MessageType.INFO, buttons=Gtk.ButtonsType.OK)
-                dialog.connect('response', lambda x, y: dialog.destroy())
-                dialog.set_markup('<b>Output from SVN:</b>\n\n%s\n\n(restart for changes to take effect)' % (pango_escape(output)))
-                dialog.show_all()
-                response = dialog.run()
-                Gdk.threads_leave()
-                if parent_self.active_threads.has_key(thread.get_ident()):
-                    del parent_self.active_threads[ thread.get_ident() ]
-        t = UpdateThread()
-        t.start()
 
     def clear_all_search_and_filters(self):
         self.ui.get_object('middle_pane_search').set_text('')
@@ -1976,7 +1953,7 @@ class MainGUI:
                            self.refresh_my_library_filter_pane)
 
     def refresh_middle_pane_from_my_library(self, refresh_library_filter_pane=True):
-        self.active_threads[ thread.get_ident() ] = 'searching local library...'
+        self.active_threads[ str(thread.get_ident()) ] = 'searching local library...'
         try:
             rows = []
             my_library_filter_pane = self.ui.get_object('my_library_filter_pane')
@@ -2093,8 +2070,8 @@ class MainGUI:
             self.refresh_my_library_count()
         except:
             traceback.print_exc()
-        if self.active_threads.has_key(thread.get_ident()):
-            del self.active_threads[ thread.get_ident() ]
+        if self.active_threads.has_key(str(thread.get_ident())):
+            del self.active_threads[ str(thread.get_ident()) ]
 
     def refresh_my_library_count(self):
         selection = self.ui.get_object('left_pane_selection')

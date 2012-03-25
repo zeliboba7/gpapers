@@ -235,7 +235,7 @@ def import_citation(url, paper=None, callback=None):
 
     log_info('Importing URL: %s' % url)
 
-    active_threads[ thread.get_ident() ] = 'importing: ' + url
+    active_threads[ str(thread.get_ident()) ] = 'importing: ' + url
     try:
         response = urllib.urlopen(url)
         if response.getcode() != 200 and response.getcode() != 302:
@@ -306,8 +306,8 @@ def import_citation(url, paper=None, callback=None):
     error.set_markup('<b>No Paper Found</b>\n\nThe given URL does not appear to contain or link to any PDF files. (perhaps you have it buy it?) Try downloading the file and adding it using "File &gt;&gt; Import..."\n\n%s' % pango_escape(url))
     error.run()
     Gdk.threads_leave()
-    if active_threads.has_key(thread.get_ident()):
-        del active_threads[ thread.get_ident() ]
+    if active_threads.has_key(str(thread.get_ident())):
+        del active_threads[str(thread.get_ident())]
 
 p_html_a = re.compile("<a [^>]+>" , re.IGNORECASE)
 p_html_a_href = re.compile('''href *= *['"]([^'^"]+)['"]''' , re.IGNORECASE)
