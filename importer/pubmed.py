@@ -25,11 +25,12 @@ class PubMedSearch(WebSearchProvider):
         WebSearchProvider.__init__(self)
 
     def _ids_received(self, message, callback, error_callback, user_data):
-        message.response_body.flatten()
+
         if not message.status_code == Soup.KnownStatusCode.OK:
             error_callback('Pubmed replied with error code %d.' % message.status_code, user_data)
         else:
-            parsed_response = BeautifulSoup.BeautifulStoneSoup(message.response_body.data)
+            response_data = message.response_body.flatten().get_data()
+            parsed_response = BeautifulSoup.BeautifulStoneSoup(response_data)
 
             # Check wether there were any hits at all
             if int(parsed_response.esearchresult.count.string) == 0:
@@ -51,11 +52,11 @@ class PubMedSearch(WebSearchProvider):
             soup_session.queue_message(message, mycallback, user_data)
 
     def _summaries_received(self, message, callback, error_callback, user_data):
-        message.response_body.flatten()
         if not message.status_code == Soup.KnownStatusCode.OK:
             error_callback('Pubmed replied with error code %d.' % message.status_code, user_data)
         else:
-            parsed_response = BeautifulSoup.BeautifulStoneSoup(message.response_body.data)
+            response_data = message.response_body.flatten().get_data()
+            parsed_response = BeautifulSoup.BeautifulStoneSoup(response_data)
 
             # get information for all documents
             documents = parsed_response.esummaryresult.findAll('docsum')
