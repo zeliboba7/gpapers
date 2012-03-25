@@ -481,13 +481,16 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
             callback(None, None, user_data)
             return
 
-        content_type = message.response_headers.get_content_type()[0]
+        log_debug('Response received (status code OK)')
+
+        content_type = message.response_headers.get_one('content-type').split(';')[0]
+        log_debug('Content type determined')
         orig_url = message.get_uri().to_string(False)
 
         if message.response_body.data:
-            # Heuristic: BibTeX data starts with a @
-            first_letter = message.response_body.data.strip()[0]
-            data = message.response_body.flatten().data
+            data = message.response_body.flatten().get_data()
+            # Heuristic: BibTeX data starts with a @            
+            first_letter = data.strip()[0]
         else:
             first_letter = None
             data = None
@@ -496,10 +499,9 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
                                                            message.get_uri()))
 
         if content_type == 'application/pdf':
-            callback(None, data, user_data)
-        elif (content_type == 'text/x-bibtex' or first_letter == '@') and paper_info is None:
-            paper_info = {'bibtex': data}
-            callback(paper_info, None, user_data)
+            callback(paper_info, data, user_data)
+        elif (content_type == 'text/x-bibtex' or first_letter == '@') and not paper_info:
+            callback(bibtex.paper_info_from_bibtex(data), paper_data, user_data)
         elif content_type == 'text/html':
             log_debug('Searching page for links')
             parsed = BeautifulSoup.BeautifulSoup(data)
@@ -550,11 +552,14 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
 
     try:
         message = Soup.Message.new(method='GET', uri_string=url)
-    except TypeError:
+        log_debug('Message generated')
+    except TypeError as ex:
+        log_error(str(ex))
         message = None
 
     if message:
         soup_session.queue_message(message, data_received, url)
+        log_debug('Message queued')
     else:
         callback(paper_info, paper_data, url)
 
@@ -580,7 +585,7 @@ def _import_from_urls(urls, callback, user_data, paper_info=None, paper_data=Non
             # Heuristic: BibTeX data starts with a @
             first_letter = message.response_body.data.strip()[0]
             log_debug('First letter of Body is: %s' % first_letter)
-            data = bytearray(message.response_body.flatten().data)
+            data = message.response_body.flatten().get_data()
         else:
             first_letter = None
             data = None
