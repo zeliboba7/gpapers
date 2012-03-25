@@ -186,6 +186,7 @@ class Paper(models.Model):
             self.read_count = self.read_count + 1
             self.save()
 
+    # FIXME: This is obsolete, see importer.pdf_file
     def extract_document_information_from_pdf(self, force_overwrite=False):
         """will overwrite the extracted_text and page_count fields, and the title if the title is empty"""
         if self.full_text and os.path.isfile(self.full_text.path):
@@ -215,8 +216,7 @@ class Paper(models.Model):
                                 author.save()
                             self.authors.add(author)
                 except:
-                    traceback.print_exc()
-            # also has: doc_info['/Author'], doc_info['/ModDate'], doc_info['/CreationDate']
+                    pass
 
             # extract the actual text
             stdin, stdout = os.popen4('ps2txt "%s"' % self.full_text.path)

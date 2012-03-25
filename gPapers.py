@@ -23,7 +23,7 @@ import mimetypes
 from datetime import datetime, timedelta, date
 
 from logger import *
-from importer import bibtex
+from importer import bibtex, pdf_file
 
 log_level_debug()
 
@@ -231,11 +231,13 @@ def import_document(filename, data=None):
     try:
         log_info('Importing paper: %s' % filename)
         md5_hexdigest = get_md5_hexdigest_from_data(data)
-        # FIXME
-        paper, created = importer.get_or_create_paper_via(full_text_md5=md5_hexdigest)
+        log_info('get/create paper with MD5: %s' % md5_hexdigest)
+        paper, created = Paper.objects.get_or_create(full_text_md5=md5_hexdigest)
         if created:
-            #paper.title = filename
-#            help(paper.full_text)
+            log_info('Trying to get some metadata from PDF')
+            paper_info = pdf_file.get_paper_info_from_pdf(data)
+            if paper_info:
+                paper_from_dictionary(paper_info, paper=paper)
             paper.save_file(defaultfilters.slugify(os.path.split(filename)[1].replace('.pdf', '')) + '.pdf', data)
             if not data:
                 paper.import_url = params['url']
@@ -543,7 +545,8 @@ class MainGUI:
         self.refresh_left_pane()
         # make sure the GUI updates on database changes
         def receiver_wrapper(sender, **kwargs):
-            self.handle_library_updates()
+            # Make sure this gets only called from the main thread
+            GObject.idle_add(lambda x : self.handle_library_updates, ())
         post_save.connect(receiver_wrapper, sender=Paper, weak=False)
         post_delete.connect(receiver_wrapper, sender=Paper, weak=False)
         self.main_window.show()
@@ -651,7 +654,7 @@ class MainGUI:
             text = self.ui.get_object('middle_pane_search').get_text()
             self.search_providers[liststore[row][4]].clear_cache(text)
 
-        self.last_middle_pane_search_string = None
+        self.last_middle_pane_search_string = ''
 
 
     def middle_pane_search_changed(self):
