@@ -20,6 +20,7 @@ from datetime import date, datetime, timedelta
 from time import strptime
 from htmlentitydefs import name2codepoint as n2cp
 import urllib, urlparse
+import hashlib
 
 import gi
 from gi.repository import GObject
@@ -62,7 +63,7 @@ def pango_escape(s):
 
 
 def get_md5_hexdigest_from_data(data):
-    m = md5.new()
+    m = hashlib.md5()
     m.update(data)
     return m.hexdigest()
 
