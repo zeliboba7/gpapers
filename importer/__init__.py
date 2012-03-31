@@ -470,8 +470,7 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
     HTML page, it will be searched for potential links, then 
     :function:`import_from_urls` will be called with this link. Finally, the
     callback is called with the `paper_info` (a dictionary) and `paper_data`
-    (binary data)
-    as an argument.
+    (binary data) as an argument.
     '''
 
     def data_received(session, message, user_data):
