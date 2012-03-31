@@ -2548,7 +2548,8 @@ class PaperEditGUI:
         self.ui.get_object('textview_abstract').get_buffer().set_text(self.paper.abstract)
         self.ui.get_object('textview_bibtex').get_buffer().set_text(self.paper.bibtex)
         self.ui.get_object('textview_extracted_text').get_buffer().set_text(self.paper.extracted_text)
-        if self.paper.full_text: self.ui.get_object('filechooserbutton').set_filename(self.paper.full_text.path)
+        if self.paper.full_text:
+            self.ui.get_object('filechooserbutton').set_filename(self.paper.full_text.path)
         self.ui.get_object('rating').set_value(self.paper.rating)
         self.ui.get_object('spinbutton_read_count').set_value(self.paper.read_count)
 
@@ -2580,12 +2581,13 @@ class PaperEditGUI:
         self.edit_dialog.show()
 
     def toolbutton_refresh_extracted_text_from_pdf(self):
-        self.paper.extract_document_information_from_pdf()
-        self.authors_model.clear()
-        for author in self.paper.get_authors_in_order():
-            self.authors_model.append((author.id, author.name))
+        if self.paper.full_text:
+            fp = open(self.paper.full_text.path, 'rb')
+            paper_info = pdf_file.get_paper_info_from_pdf(fp.read())
+            fp.close()
+        self.paper.extracted_text = paper_info.get('extracted_text')
         self.ui.get_object('textview_extracted_text').get_buffer().set_text(self.paper.extracted_text)
-        self.ui.get_object('entry_title').set_text(self.paper.title)
+        self.paper.save()
 
     def init_references_tab(self):
         treeview_references = self.ui.get_object('treeview_references')
