@@ -334,7 +334,7 @@ def paper_from_dictionary(paper_info, paper=None):
                 author_obj.save()
 
     # Simple attributes
-    attributes = ['title', 'abstract', 'doi']
+    attributes = ['title', 'abstract', 'doi', 'extracted_text']
 
     for attr in attributes:
         log_debug('Checking if %s is in paper_info' % attr)
@@ -1562,7 +1562,7 @@ class MainGUI:
 
             source = liststore[rows[0]][15]
             log_debug('Source: %s' % source)
-            if not paper and source != 'local':  # This is a search result
+            if not paper and source is not None and source != 'local':  # This is a search result
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_ADD)
                 button.set_tooltip_text('Add this paper to your library...')
                 provider = self.search_providers[source]

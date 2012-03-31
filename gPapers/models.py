@@ -22,9 +22,6 @@ import desktop, pyPdf
 
 from logger import log_debug
 
-p_doi = re.compile('doi *: *(10.[a-z0-9]+/[a-z0-9.]+)', re.IGNORECASE)
-
-
 class Publisher(models.Model):
 
     name = models.CharField(max_length='1024')
@@ -166,9 +163,6 @@ class Paper(models.Model):
                             django.core.files.base.ContentFile(raw_contents),
                             save)
         self.save()
-        log_debug('Extracting information from PDF')
-        try: self.extract_document_information_from_pdf()
-        except: traceback.print_exc()
 
     def get_authors_in_order(self):
         from django.db import connection
@@ -185,53 +179,6 @@ class Paper(models.Model):
             desktop.open(self.full_text.path)
             self.read_count = self.read_count + 1
             self.save()
-
-    # FIXME: This is obsolete, see importer.pdf_file
-    def extract_document_information_from_pdf(self, force_overwrite=False):
-        """will overwrite the extracted_text and page_count fields, and the title if the title is empty"""
-        if self.full_text and os.path.isfile(self.full_text.path):
-            content = []
-
-            # Load PDF into pyPDF
-            pdf = pyPdf.PdfFileReader(file(self.full_text.path, "rb"))
-            doc_info = pdf.getDocumentInfo()
-            content.append(str(doc_info))
-            content.append('\n\n')
-            if force_overwrite or not self.title:
-                try: self.title = doc_info['/Title']
-                except: self.title = os.path.split(self.full_text.path)[1]
-            if force_overwrite or self.authors.count() == 0:
-                try:
-                    author_text = doc_info['/Author']
-                    print 'author_text', author_text
-                    if author_text.find(';') > 0:
-                        author_list = author_text.split(';')
-                    else:
-                        author_list = author_text.split(',')
-                    if author_list:
-                        self.authors.clear()
-                        for author_name in author_list:
-                            author, created = Author.objects.get_or_create(name=author_name.strip())
-                            if created:
-                                author.save()
-                            self.authors.add(author)
-                except:
-                    pass
-
-            # extract the actual text
-            stdin, stdout = os.popen4('ps2txt "%s"' % self.full_text.path)
-            for line in stdout:
-                content.append(line)
-                try:
-                    self.doi = p_doi.search(line).group(1)
-                    print self.doi
-                except: pass
-
-            self.extracted_text = ''.join(content)
-        else:
-            self.page_count = 0
-            self.extracted_text = ''
-        return self.extracted_text
 
     class Admin:
         list_display = ('id', 'doi', 'title')
