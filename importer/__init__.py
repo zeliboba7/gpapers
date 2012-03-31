@@ -701,14 +701,35 @@ class WebSearchProvider(object):
             del self.search_cache[text]
 
     def search(self, search_string, callback, error_callback):
+
+        # A tuple identifying the search, making it possible for the callback
+        # function to deal with the results properly (otherwise results arriving
+        # out of order could lead to wrongly displayed results)
+        user_data = (self.label, search_string)
+
         if not search_string:
-            return []
+            callback(user_data, [])
+            return
 
         if search_string in self.search_cache:
-            return self.search_cache[search_string]
+            log_debug('Result for "%s" already in cache.' % search_string)
+            callback(user_data, self.search_cache[search_string])
+            return
+
+        log_info('Search for "%s" is not cached by this provider, starting new search' % search_string)
 
         try:
-            self.search_async(search_string, callback, error_callback)
+            def callback_wrapper(search_results):
+                '''
+                Before calling the actual callback, save the result in the
+                cache and add `user_data` (tuple identifying request and search
+                provider) to the call.
+                '''
+                log_debug('Saving %s in cache for "%s"' % (search_results, search_string))
+                self.search_cache[search_string] = search_results
+                callback(user_data, search_results)
+
+            self.search_async(search_string, callback_wrapper, error_callback)
         except Exception as ex:
             error_callback(ex, None)
 
@@ -740,30 +761,23 @@ class SimpleWebSearchProvider(WebSearchProvider):
             message = self.prepare_search_message(search_string)
 
             def my_callback(session, message, user_data):
-                self.response_received(message, callback, error_callback,
-                                       user_data)
+                self.response_received(message, callback, error_callback)
 
-            # Provide a tuple of label and search string as `user_data` to the
-            # callback -- this way it is clear to what search a result/error belongs
-            soup_session.queue_message(message, my_callback, (self.label,
-                                                              search_string))
+            soup_session.queue_message(message, my_callback, None)
         except Exception as ex:
             error_callback(ex, search_string)
 
-    def response_received(self, message, callback, error_callback,
-                            user_data):
+    def response_received(self, message, callback, error_callback):
         '''
         Will be called when the server returns a response.
         '''
-        log_info('Received a response for %s' % str(user_data))
         if message.status_code == Soup.KnownStatusCode.OK:
             #try:
-                callback(user_data,
-                         self.parse_response(message.response_body.data))
+                callback(self.parse_response(message.response_body.data))
             #except Exception as ex:
             #    error_callback(ex, user_data)
         else:
-            error_callback(message.status_code, user_data)
+            error_callback(message.status_code)
 
     def import_paper_after_search(self, data, callback):
         try:
