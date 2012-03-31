@@ -13,6 +13,7 @@ from logger import log_debug, log_info, log_error
 # a more or less arbitrary suffix
 p_doi = re.compile('doi\s*:?\s*(10.[0-9]+/[^/].+)\s', re.IGNORECASE)
 
+
 def get_paper_info_from_pdf(data):
     fp = BytesIO(data)
     # Create a PDF parser object associated with the file object.
