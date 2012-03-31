@@ -29,11 +29,7 @@ log_level_debug()
 
 RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
 PROGRAM = 'gPapers'
-SVN_INFO = commands.getoutput('svn info')
-VERSION = ''
-for line in SVN_INFO.split('\n'):
-    if line.startswith('Revision:'):
-        VERSION = 'svn:' + line[10:]
+__version__ = '0.5dev'
 
 GPL = open(RUN_FROM_DIR + 'GPL.txt', 'r').read()
 
@@ -625,13 +621,14 @@ class MainGUI:
 
     def show_about_dialog(self, o):
         about = Gtk.AboutDialog()
-        about.set_name('gPapers')
-        about.set_version(VERSION)
-        about.set_copyright('Copyright (c) 2008 Derek Anderson')
+        about.set_program_name('gPapers')
+        about.set_version(__version__)
+        about.set_copyright('Copyright (c) 2008, 2009 Derek Anderson; 2012 Derek Anderson & Marcel Stimberg')
         about.set_comments('''The Gnome-based Scientific Paper Organizer''')
-        about.set_license(GPL)
+        about.set_license_type(Gtk.License.GPL_3_0)
         about.set_website('http://gpapers.org/')
-        about.set_authors(['Derek Anderson', 'http://kered.org'])
+        about.set_authors(['Derek Anderson <public@kered.org>',
+                           'Marcel Stimberg'])
         about.connect('response', lambda x, y: about.destroy())
         about.show()
 
