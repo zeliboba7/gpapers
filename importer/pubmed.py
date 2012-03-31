@@ -24,17 +24,16 @@ class PubMedSearch(WebSearchProvider):
     def __init__(self):
         WebSearchProvider.__init__(self)
 
-    def _ids_received(self, message, callback, error_callback, user_data):
+    def _ids_received(self, message, callback, error_callback):
 
         if not message.status_code == Soup.KnownStatusCode.OK:
-            error_callback('Pubmed replied with error code %d.' % message.status_code, user_data)
+            error_callback('Pubmed replied with error code %d.' % message.status_code)
         else:
             response_data = message.response_body.flatten().get_data()
             parsed_response = BeautifulSoup.BeautifulStoneSoup(response_data)
 
-            # Check wether there were any hits at all
+            # Check whether there were any hits at all
             if int(parsed_response.esearchresult.count.string) == 0:
-                log_info('No hits for search string "%s"' % user_data[1])
                 return # Nothing to do anymore
 
             # Continue with a second request asking for the summaries
@@ -46,12 +45,11 @@ class PubMedSearch(WebSearchProvider):
             message = Soup.Message.new(method='GET', uri_string=query)
 
             def mycallback(session, message, user_data):
-                self._summaries_received(message, callback, error_callback,
-                                         user_data)
+                self._summaries_received(message, callback, error_callback)
 
-            soup_session.queue_message(message, mycallback, user_data)
+            soup_session.queue_message(message, mycallback, None)
 
-    def _summaries_received(self, message, callback, error_callback, user_data):
+    def _summaries_received(self, message, callback, error_callback):
         if not message.status_code == Soup.KnownStatusCode.OK:
             error_callback('Pubmed replied with error code %d.' % message.status_code, user_data)
         else:
@@ -89,7 +87,7 @@ class PubMedSearch(WebSearchProvider):
 
                 papers.append(info)
 
-            callback(user_data, papers)
+            callback(papers)
 
     def search_async(self, search_text, callback, error_callback):
         '''
@@ -103,10 +101,9 @@ class PubMedSearch(WebSearchProvider):
         message = Soup.Message.new(method='GET', uri_string=query)
 
         def mycallback(session, message, user_data):
-            self._ids_received(message, callback, error_callback, user_data)
+            self._ids_received(message, callback, error_callback)
 
-        soup_session.queue_message(message, mycallback, (self.label,
-                                                         search_text))
+        soup_session.queue_message(message, mycallback, None)
 
     def _paper_info_received(self, message, callback, user_data):
         if not message.status_code == Soup.KnownStatusCode.OK:
