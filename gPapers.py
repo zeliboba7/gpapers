@@ -365,10 +365,20 @@ class MainGUI:
             # FIXME: This should be handled via an error callback
             return
 
-        log_debug('Calling paper_from_dictionary for %s' % str(paper_info))
-        paper = paper_from_dictionary(paper_info)
-        log_debug('paper_from_dictionary returned %s' % str(paper))
         if paper_data is not None:
+            # Get some info from the PDF:
+            paper_info_pdf = pdf_file.get_paper_info_from_pdf(paper_data)
+
+            # Add everything that is not already known
+            if paper_info is None:
+                paper_info = paper_info_pdf
+            else:
+                for key in paper_info_pdf.keys():
+                    if not key in paper_info:
+                        paper_info[key] = paper_info_pdf[key]
+
+            paper = paper_from_dictionary(paper_info)
+
             #TODO: What is a good filename? Make this configurable?
             if paper.doi:
                 filename = 'doi_' + paper.doi
@@ -381,7 +391,13 @@ class MainGUI:
             log_debug('Saving paper to "%s"' % filename)
             paper.save_file(filename, paper_data)
             log_debug('Paper saved')
+        else:
+            log_debug('Calling paper_from_dictionary for %s' % str(paper_info))
+            paper = paper_from_dictionary(paper_info)
 
+        paper.save()
+
+        # TODO: Should be called automatically because of the save signal
         self.refresh_middle_pane_from_my_library()
 
     def import_url_dialog(self, o):
@@ -967,6 +983,7 @@ class MainGUI:
         treeview.get_column(1).get_cells()[0].set_property('wrap-width', width)
 
     def handle_library_updates(self):
+        log_debug('handle_libray_updates called')
         selection = self.ui.get_object('left_pane_selection')
         liststore, row = selection.get_selected()
         if liststore[row][4] == 'local':
