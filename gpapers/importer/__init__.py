@@ -437,6 +437,30 @@ def find_and_attach_pdf(paper, urls, visited_urls=set()):
                 if find_and_attach_pdf(paper, list(promising_links), visited_urls=visited_urls): return
 
 
+def get_bibtex_for_doi(doi, callback):
+    '''
+    Asynchronously retrieves the bibtex data for a document with a given `doi`,
+    querying the crossref service. The `callback` function will be called with
+    two arguments, a string containing the bibtex data and the doi for which
+    the data was retrieved. In case of a failed retrieval, callback will be
+    called with `None` for the bibtex data.
+    '''
+    url = 'http://dx.doi.org/' + doi
+    message = Soup.Message.new(method='GET', uri_string=url)
+    # Request BibTeX data instead of a redirect to the document URL
+    message.request_headers.append('Accept', 'text/bibliography; style=bibtex')
+
+    def mycallback(session, message, user_data):
+        if message.status_code == Soup.KnownStatusCode.OK:
+            bibtex = message.response_body.flatten().get_data()
+            callback(bibtex, user_data)
+        else:
+            callback(None, user_data)
+
+    # Use the doi as user_data for the callback
+    soup_session.queue_message(message, mycallback, doi)
+
+
 def determine_content_type(filename):
     '''
     Determines the content type for a file. Returns either a string like
@@ -797,3 +821,22 @@ class SimpleWebSearchProvider(WebSearchProvider):
 
     def fill_in_paper_info(self, data):
         raise NotImplementedError()
+
+if __name__ == '__main__':
+    log_level_debug()
+
+    def print_bibtex(bibtex, doi):
+        print 'Received bibtex for DOI %s:\n%s' % (doi, bibtex)
+
+    def print_all(paper_info, paper_data, user_data):
+        print 'paper_info', paper_info
+        print 'paper_data', len(paper_data)
+        Gtk.main_quit()
+
+    print 'Asking for bibtex data'
+    get_bibtex_for_doi('10.1371/journal.pone.0020409', print_bibtex)
+
+    print 'Importing from URL'
+    import_from_url('http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0020409', print_all)
+
+    Gtk.main()
