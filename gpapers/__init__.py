@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, date
 
 from gpapers.logger import *
 from gpapers.importer import bibtex, pdf_file
+from gi.repository import Gio
 
 log_level_debug()
 
@@ -58,6 +59,7 @@ import gpapers.desktop, gpapers.openanything
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'gpapers.settings'
 import django.core.management
+from django.core.exceptions import MultipleObjectsReturned
 django.core.management.setup_environ(gpapers.settings)
 from django.db.models import Q
 from django.template import defaultfilters
@@ -94,12 +96,14 @@ def humanize_count(x, s, p, places=1):
         output.append(p)
     return ' '.join(output)
 
+
 def truncate_long_str(s, max_length=96):
     s = str(s)
     if len(s) < max_length:
         return s
     else:
         return s[0:max_length] + '...'
+
 
 def set_model_from_list(cb, items):
     """Setup a ComboBox or ComboBoxEntry based on a list of (int,str)s."""
@@ -111,11 +115,13 @@ def set_model_from_list(cb, items):
     cb.pack_start(cell, True)
     cb.add_attribute(cell, 'text', 1)
 
+
 def index_of_in_list_of_lists(value, list, column, not_found= -1):
     for i in range(0, len(list)):
         if value == list[i][column]:
             return i
     return not_found
+
 
 def make_all_columns_resizeable_clickable_ellipsize(columns):
     for column in columns:
@@ -126,21 +132,26 @@ def make_all_columns_resizeable_clickable_ellipsize(columns):
             if renderer.__class__.__name__ == 'CellRendererText':
                 renderer.set_property('ellipsize', Pango.EllipsizeMode.END)
 
+
 def fetch_citation_via_middle_top_pane_row(row):
     t = thread.start_new_thread(import_citation_via_middle_top_pane_row, (row,))
+
 
 def fetch_citations_via_urls(urls):
     log_info('trying to fetch: %s' % str(urls))
     t = thread.start_new_thread(import_citations, (urls,))
 
+
 def fetch_citations_via_references(references):
     log_info('trying to fetch: %s' % str(references))
     t = thread.start_new_thread(import_citations_via_references, (references,))
+
 
 def import_citations(urls):
     for url in urls:
         importer.import_citation(url, callback=main_gui.refresh_middle_pane_search)
     main_gui.refresh_middle_pane_search()
+
 
 def import_citations_via_references(references):
     for reference in references:
@@ -154,7 +165,8 @@ def import_citations_via_references(references):
                 reference.save()
     main_gui.refresh_middle_pane_search()
 
-def import_documents_via_filenames(filenames):
+
+def import_documents_via_filenames(filenames, callback):
     '''
     Adds existing files or directories to the database and copies the documents
     to the MEDIA_ROOT/papers directory.
@@ -181,15 +193,18 @@ def import_documents_via_filenames(filenames):
     # TODO: Show an error message if no file is found?
 
     for filename in all_files:
-        data = open(filename, 'r').read()
-        import_document(filename, data)
+        gfile = Gio.File.new_for_path(filename)
+        # first argument is the `cancellable` object
+        gfile.load_contents_async(None, callback, filename)
 
     main_gui.refresh_middle_pane_search()
+
 
 def paper_info_received(paper):
     paper.save()
     importer.import_citation(paper.import_url, paper=paper,
                              callback=main_gui.refresh_middle_pane_search)
+
 
 def import_citation_via_middle_top_pane_row(row):
     # id, authors, title, journal, year, rating, abstract, icon, import_url, doi, created, updated, empty_str, pubmed_id
@@ -214,36 +229,6 @@ def import_citation_via_middle_top_pane_row(row):
                                      provider=provider,
                                      callback=paper_info_received)
 
-
-def import_document(filename, data=None):
-    paper = None
-    if not data:
-        params = openanything.fetch(filename)
-        data = params['data']
-        if not data:
-            log_error('Could not get: %s' % filename)
-    try:
-        log_info('Importing paper: %s' % filename)
-        md5_hexdigest = get_md5_hexdigest_from_data(data)
-        log_info('get/create paper with MD5: %s' % md5_hexdigest)
-        paper, created = Paper.objects.get_or_create(full_text_md5=md5_hexdigest)
-        if created:
-            log_info('Trying to get some metadata from PDF')
-            paper_info = pdf_file.get_paper_info_from_pdf(data)
-            if paper_info:
-                paper_from_dictionary(paper_info, paper=paper)
-            paper.save_file(defaultfilters.slugify(os.path.split(filename)[1].replace('.pdf', '')) + '.pdf', data)
-            if not data:
-                paper.import_url = params['url']
-            paper.save()
-            log_info('Imported paper: %s' % filename)
-        else:
-            log_info('Paper for file %s already exists (%s, "%s")' % (filename, str(paper.get_authors_in_order()), paper.title))
-
-    except:
-        traceback.print_exc()
-        if paper:
-            paper.delete()
 
 def row_from_dictionary(info, provider=None):
     assert info is not None
@@ -344,6 +329,23 @@ class MainGUI:
     current_middle_top_pane_refresh_thread_ident = None
     active_threads = {}
 
+    def bibtex_received(self, bibtex_data, doi):
+        '''
+        Callback function that is called when new bibtex data for a paper
+        arrives. Writes the information to the paper object and saves it.
+        '''
+        try:
+            # Get the paper for the DOI -- should be only one!
+            paper = Paper.objects.get(doi=doi)
+
+            paper_info = bibtex.paper_info_from_bibtex(bibtex_data)
+            paper_from_dictionary(paper_info, paper=paper)
+
+        except django.MultipleObjectsReturned:
+            log_warning('More than one paper in the database has DOI %s -- aborting.' % doi)
+        except Paper.DoesNotExist:
+            log_warning('No paper in the database has DOI %s -- aborting.' % doi)
+
     def document_imported(self, paper_info, paper_data, user_data):
         '''
         Should be called after a paper is imported. `paper_info` is a
@@ -364,7 +366,10 @@ class MainGUI:
             # Add everything that is not already known
             if paper_info is None:
                 paper_info = paper_info_pdf
+                # If we get a DOI, download the metadata
+                need_paper_info = True
             else:
+                need_paper_info = False
                 for key in paper_info_pdf.keys():
                     if not key in paper_info:
                         paper_info[key] = paper_info_pdf[key]
@@ -383,14 +388,14 @@ class MainGUI:
             log_debug('Saving paper to "%s"' % filename)
             paper.save_file(filename, paper_data)
             log_debug('Paper saved')
+            if need_paper_info and paper.doi:
+                log_debug('Downloading metadata')
+                importer.get_bibtex_for_doi(paper.doi, self.bibtex_received)
         else:
             log_debug('Calling paper_from_dictionary for %s' % str(paper_info))
             paper = paper_from_dictionary(paper_info)
 
         paper.save()
-
-        # TODO: Should be called automatically because of the save signal
-        self.refresh_middle_pane_from_my_library()
 
     def import_url_dialog(self, o):
         '''
@@ -459,8 +464,16 @@ class MainGUI:
         dialog.show_all()
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            threading.Thread(target=import_documents_via_filenames,
-                             args=(dialog.get_filenames(),)).start()
+
+            def mycallback(file_object, asyncresult, user_data):
+                # Get the actual file content 
+                file_content = file_object.load_contents_finish(asyncresult)[1]
+
+                self.document_imported(paper_data=file_content, paper_info=None,
+                                       user_data=user_data)
+
+            import_documents_via_filenames(dialog.get_filenames(),
+                                           mycallback)
         dialog.destroy()
 
     def import_directory_dialog(self, o):
