@@ -72,7 +72,6 @@ def get_paper_info_from_pdf(data):
             log_debug('Found a DOI: %s' % doi)
             paper_info['doi'] = doi
 
-    log_debug('Extracted Content: %s' % paper_info['extracted_text'])
     device.close()
     content.close()
 
