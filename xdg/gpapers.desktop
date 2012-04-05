@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Exec=gpapers
+Icon=gpapers
+StartupNotify=true
+Terminal=false
+Categories=GNOME;Application;Office;
+MimeType=application/pdf
+Name=gPapers
+Comment=The Gnome-based Scientific Paper Organizer
