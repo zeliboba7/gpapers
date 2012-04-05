@@ -3,10 +3,10 @@ import urllib
 import BeautifulSoup
 from gi.repository import Soup  # @UnresolvedImport
 
-from logger import log_debug, log_info, log_error
+from gpapers.logger import log_debug, log_info, log_error
 from BeautifulSoup import BeautifulStoneSoup
 
-from importer import WebSearchProvider, soup_session
+from gpapers.importer import WebSearchProvider, soup_session
 
 BASE_URL = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
 ESEARCH_QUERY = 'esearch.fcgi?db=pubmed&term=%s&usehistory=y'

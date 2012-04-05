@@ -7,7 +7,7 @@ from pdfminer.pdfinterp import PDFResourceManager, process_pdf
 from pdfminer.layout import LAParams
 from pdfminer.converter import TextConverter
 
-from logger import log_debug, log_info, log_error
+from gpapers.logger import log_debug, log_info, log_error
 
 # A DOI consists of a numeric prefix starting with "10." followed by "/" and
 # a more or less arbitrary suffix

@@ -5,10 +5,9 @@ from gi.repository import Soup  # @UnresolvedImport
 import BeautifulSoup
 from django.template import defaultfilters
 
-import openanything
-from logger import log_debug, log_info, log_error
-from bibtex import paper_info_from_bibtex
-from importer import SimpleWebSearchProvider, html_strip, soup_session
+from gpapers.logger import log_debug, log_info, log_error
+from gpapers.importer.bibtex import paper_info_from_bibtex
+from gpapers.importer import SimpleWebSearchProvider, html_strip, soup_session
 
 BASE_URL = 'http://scholar.google.com/'
 

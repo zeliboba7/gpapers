@@ -22,16 +22,14 @@ import commands, math, os, sys, thread, threading, time, traceback
 import mimetypes
 from datetime import datetime, timedelta, date
 
-from logger import *
-from importer import bibtex, pdf_file
+from gpapers.logger import *
+from gpapers.importer import bibtex, pdf_file
 
 log_level_debug()
 
-RUN_FROM_DIR = os.path.abspath(os.path.dirname(sys.argv[0])) + '/'
+BASE_DIR = os.path.abspath(os.path.split(__file__)[0]) + '/../'
 PROGRAM = 'gPapers'
 __version__ = '0.5dev'
-
-GPL = open(RUN_FROM_DIR + 'GPL.txt', 'r').read()
 
 DATE_FORMAT = '%Y-%m-%d'
 
@@ -55,27 +53,27 @@ MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION = ('reorder_playlist',
                                                Gtk.TargetFlags.SAME_WIDGET, 1)
 PDF_PREVIEW_MOVE_NOTE_DND_ACTION = ('move_note', Gtk.TargetFlags.SAME_WIDGET, 2)
 
-import settings
-import desktop, openanything
+import gpapers.settings
+import gpapers.desktop, gpapers.openanything
 
-os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+os.environ['DJANGO_SETTINGS_MODULE'] = 'gpapers.settings'
 import django.core.management
-django.core.management.setup_environ(settings)
+django.core.management.setup_environ(gpapers.settings)
 from django.db.models import Q
 from django.template import defaultfilters
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
-import deseb
-from gPapers.models import *
-import importer
+import gpapers.deseb
+from gpapers.gPapers.models import *
+import gpapers.importer as importer
 
-from importer import pango_escape, get_md5_hexdigest_from_data
-from importer import pubmed, google_scholar, jstor
+from gpapers.importer import pango_escape, get_md5_hexdigest_from_data
+from gpapers.importer import pubmed, google_scholar, jstor
 
-NOTE_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'note.png'))
-BOOKMARK_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'bookmark.png'))
-GRAPH_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'drawing.png'))
+NOTE_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons', 'note.png'))
+BOOKMARK_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons', 'bookmark.png'))
+GRAPH_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons', 'drawing.png'))
 
 def humanize_count(x, s, p, places=1):
     output = []
@@ -293,8 +291,6 @@ def paper_from_dictionary(paper_info, paper=None):
 
     Returns the `paper` object.
     '''
-
-    log_debug('paper_from_dictionary received: %s' % str(paper_info))
 
     if paper is None:
         paper = Paper.objects.create()
@@ -536,7 +532,7 @@ class MainGUI:
                          'jstor' : jstor.JSTORSearch()}
         self.displayed_paper = None
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(RUN_FROM_DIR + 'ui.xml')
+        self.ui.add_from_file(BASE_DIR + 'data/ui.xml')
         self.main_window = self.ui.get_object('main_window')
         self.main_window.connect("delete-event", lambda x, y: sys.exit(0))
         self.init_menu()
@@ -565,7 +561,7 @@ class MainGUI:
 
     def init_busy_notifier(self):
         busy_notifier = self.ui.get_object('busy_notifier')
-        busy_notifier.set_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'blank.gif'))
+        busy_notifier.set_from_file(os.path.join(BASE_DIR, 'icons', 'blank.gif'))
         self.busy_notifier_is_running = False
 
         treeview_running_tasks = self.ui.get_object('treeview_running_tasks')
@@ -588,12 +584,12 @@ class MainGUI:
             for x in self.active_threads.items():
                 self.treeview_running_tasks_model.append(x)
             if not self.busy_notifier_is_running:
-                self.ui.get_object('busy_notifier').set_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'process-working.gif'))
+                self.ui.get_object('busy_notifier').set_from_file(os.path.join(BASE_DIR, 'icons', 'process-working.gif'))
                 self.busy_notifier_is_running = True
                 self.ui.get_object('treeview_running_tasks').show()
         else:
             if self.busy_notifier_is_running:
-                self.ui.get_object('busy_notifier').set_from_file(os.path.join(RUN_FROM_DIR, 'icons', 'blank.gif'))
+                self.ui.get_object('busy_notifier').set_from_file(os.path.join(BASE_DIR, 'icons', 'blank.gif'))
                 self.busy_notifier_is_running = False
                 self.ui.get_object('treeview_running_tasks').hide()
 
@@ -990,10 +986,10 @@ class MainGUI:
 
     def refresh_left_pane(self):
         # FIXME: These should not be loaded again and again
-        NEVER_READ_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR,
+        NEVER_READ_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR,
                                                                       'icons',
                                                                       'applications-development.png'))
-        FAVORITE_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR,
+        FAVORITE_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR,
                                                                     'icons',
                                                                     'emblem-favorite.png'))
         left_pane = self.ui.get_object('left_pane')
@@ -1029,7 +1025,7 @@ class MainGUI:
 
         for _, provider in self.search_providers.iteritems():
             # FIXME: Load them in the providers
-            provider_icon = GdkPixbuf.Pixbuf.new_from_file(os.path.join(RUN_FROM_DIR,
+            provider_icon = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR,
                                                                         'icons',
                                                                         provider.icon))
             self.left_pane_model.append(None, (provider.name,
@@ -2141,7 +2137,7 @@ class AuthorEditGUI:
         else:
             self.author = Author.objects.get(id=author_id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(RUN_FROM_DIR + 'author_edit_gui.xml')
+        self.ui.add_from_file(BASE_DIR + 'data/author_edit_gui.xml')
         self.author_edit_dialog = self.ui.get_object('author_edit_dialog')
         self.author_edit_dialog.connect("delete-event", lambda x, y : self.author_edit_dialog.destroy)
         self.ui.get_object('button_connect').connect("clicked", lambda x: self.show_connect_menu())
@@ -2297,7 +2293,7 @@ class OrganizationEditGUI:
     def __init__(self, id):
         self.organization = Organization.objects.get(id=id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(RUN_FROM_DIR + 'organization_edit_gui.xml')
+        self.ui.add_from_file(BASE_DIR + 'data/organization_edit_gui.xml')
         self.edit_dialog = self.ui.get_object('organization_edit_dialog')
         self.edit_dialog.connect("delete-event", lambda x, y : self.edit_dialog.destroy)
         self.ui.get_object('button_connect').connect("clicked", lambda x: self.show_connect_menu())
@@ -2356,7 +2352,7 @@ class SourceEditGUI:
     def __init__(self, id):
         self.source = Source.objects.get(id=id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(RUN_FROM_DIR + 'source_edit_gui.xml')
+        self.ui.add_from_file(BASE_DIR + 'data/source_edit_gui.xml')
         self.edit_dialog = self.ui.get_object('source_edit_dialog')
         self.edit_dialog.connect("delete-event", lambda x, y : self.edit_dialog.destroy)
         self.ui.get_object('button_connect').connect("clicked", lambda x: self.show_connect_menu())
@@ -2417,7 +2413,7 @@ class ReferenceEditGUI:
     def __init__(self, id):
         self.reference = Reference.objects.get(id=id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(RUN_FROM_DIR + 'reference_edit_gui.xml')
+        self.ui.add_from_file(BASE_DIR + 'data/reference_edit_gui.xml')
         self.edit_dialog = self.ui.get_object('reference_edit_dialog')
         self.edit_dialog.connect("delete-event", lambda x, y : self.edit_dialog.destroy)
         self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy())
@@ -2475,7 +2471,7 @@ class CitationEditGUI:
     def __init__(self, id):
         self.reference = Reference.objects.get(id=id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(RUN_FROM_DIR + 'citation_edit_gui.xml')
+        self.ui.add_from_file(BASE_DIR + 'data/citation_edit_gui.xml')
         self.edit_dialog = self.ui.get_object('citation_edit_dialog')
         self.edit_dialog.connect("delete-event", lambda x, y : self.edit_dialog.destroy)
         self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy())
@@ -2532,7 +2528,7 @@ class PaperEditGUI:
     def __init__(self, id):
         self.paper = Paper.objects.get(id=id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(RUN_FROM_DIR + 'paper_edit_gui.xml')
+        self.ui.add_from_file(BASE_DIR + 'data/paper_edit_gui.xml')
         self.edit_dialog = self.ui.get_object('paper_edit_dialog')
         self.edit_dialog.connect("delete-event", lambda x, y : self.edit_dialog.destroy)
         self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy())
@@ -2804,10 +2800,14 @@ def init_db():
             deseb.schema_evolution.evolvedb(app, interactive=False, managed_upgrade_only=True)
 
 
-if __name__ == "__main__":
-
-    Gtk.init(sys.argv)
-    MEDIA_ROOT = settings.MEDIA_ROOT
+def main(argv):
+    '''
+    Starts gpapers with the given command line arguments `argv`.
+    Currently all arguments are ignored by gpapers but may be used to give
+    general GTK parameters.
+    '''
+    Gtk.init(argv)
+    MEDIA_ROOT = gpapers.settings.MEDIA_ROOT
 
     log_info('using database at %s' % MEDIA_ROOT)
 
