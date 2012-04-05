@@ -18,9 +18,10 @@
 import hashlib, os, re, traceback
 from django.db import models
 import django.core.files.base
-import desktop, pyPdf
+from gpapers import desktop
+import pyPdf
 
-from logger import log_debug
+from gpapers.logger import log_debug
 
 class Publisher(models.Model):
 

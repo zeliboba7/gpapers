@@ -34,9 +34,10 @@ from pyPdf import PdfFileReader
 
 #from gPapers.models import *
 from django.template import defaultfilters
-import BeautifulSoup, openanything
+import BeautifulSoup
+from gpapers import openanything
 
-from logger import *
+from gpapers.logger import *
 import bibtex
 
 active_threads = None
@@ -796,14 +797,3 @@ class SimpleWebSearchProvider(WebSearchProvider):
 
     def fill_in_paper_info(self, data):
         raise NotImplementedError()
-
-if __name__ == '__main__':
-    log_level_debug()
-
-    def print_all(paper_info, paper_data):
-        print 'paper_info', paper_info
-        print 'paper_data', len(paper_data)
-        Gtk.main_quit()
-
-    import_from_url('http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0020409', print_all)
-    Gtk.main()

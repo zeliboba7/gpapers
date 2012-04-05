@@ -1,6 +1,6 @@
 # coding: utf8
 import re
-from logger import log_info, log_debug
+from gpapers.logger import log_info, log_debug
 import pprint
 """ Pyparsing parser for BibTeX files
 
