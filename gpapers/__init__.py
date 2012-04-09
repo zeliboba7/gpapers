@@ -57,7 +57,7 @@ MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION = ('reorder_playlist',
 PDF_PREVIEW_MOVE_NOTE_DND_ACTION = ('move_note', Gtk.TargetFlags.SAME_WIDGET, 2)
 
 import gpapers.settings
-import gpapers.desktop, gpapers.openanything
+import gpapers.desktop
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'gpapers.settings'
 import django.core.management
