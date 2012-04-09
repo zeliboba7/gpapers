@@ -20,64 +20,67 @@
 #    You should have received a copy of the GNU General Public License
 #    along with gPapers.  If not, see <http://www.gnu.org/licenses/>.
 
-import commands, math, os, sys, thread, threading, time, traceback
-import mimetypes
+import commands
 from datetime import datetime, timedelta, date
+import math
+import mimetypes
+import os
+import sys
+import thread
+import threading
+import time
+import traceback
 
-from gpapers.logger import *
-from gpapers.importer import bibtex, pdf_file
 from gi.repository import Gio
-
-log_level_debug()
-
-BASE_DIR = os.path.abspath(os.path.split(__file__)[0]) + '/../'
-PROGRAM = 'gPapers'
-__version__ = '0.5dev'
-
-DATE_FORMAT = '%Y-%m-%d'
-
-# GUI imports
-try:
-    from gi.repository import GObject
-    from gi.repository import Gdk
-    from gi.repository import Gtk
-    from gi.repository import GdkPixbuf
-    from gi.repository import Pango
-    from gi.repository import Poppler
-    GObject.threads_init()
-except:
-    traceback.print_exc()
-    log_error('Could not import required GTK libraries.')
-    sys.exit()
-
-LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION = ('add_to_playlist',
-                                        Gtk.TargetFlags.SAME_APP, 0)
-MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION = ('reorder_playlist',
-                                               Gtk.TargetFlags.SAME_WIDGET, 1)
-PDF_PREVIEW_MOVE_NOTE_DND_ACTION = ('move_note', Gtk.TargetFlags.SAME_WIDGET, 2)
-
-import gpapers.settings
-import gpapers.desktop
+from gi.repository import GObject
+from gi.repository import Gdk
+from gi.repository import Gtk
+from gi.repository import GdkPixbuf
+from gi.repository import Pango
+from gi.repository import Poppler
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'gpapers.settings'
+import gpapers.settings
 import django.core.management
-from django.core.exceptions import MultipleObjectsReturned
 django.core.management.setup_environ(gpapers.settings)
+from django.core.exceptions import MultipleObjectsReturned
 from django.db.models import Q
 from django.template import defaultfilters
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
 import deseb
+
+from gpapers.logger import *
+from gpapers.importer import bibtex, pdf_file
+import gpapers.desktop
 from gpapers.gPapers.models import *
 import gpapers.importer as importer
-
 from gpapers.importer import pango_escape, get_md5_hexdigest_from_data
 from gpapers.importer import pubmed, google_scholar, jstor
 
-NOTE_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons', 'note.png'))
-BOOKMARK_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons', 'bookmark.png'))
-GRAPH_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons', 'drawing.png'))
+log_level_debug()
+
+BASE_DIR = os.path.abspath(os.path.split(__file__)[0]) + '/../'
+PROGRAM = 'gPapers'
+DATE_FORMAT = '%Y-%m-%d'
+LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION = ('add_to_playlist',
+                                        Gtk.TargetFlags.SAME_APP, 0)
+MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION = ('reorder_playlist',
+                                               Gtk.TargetFlags.SAME_WIDGET, 1)
+PDF_PREVIEW_MOVE_NOTE_DND_ACTION = ('move_note', Gtk.TargetFlags.SAME_WIDGET,
+                                    2)
+NOTE_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons',
+                                                        'note.png'))
+BOOKMARK_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons',
+                                                            'bookmark.png'))
+GRAPH_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons',
+                                                         'drawing.png'))
+
+__version__ = '0.5dev'
+
+GObject.threads_init()
+
 
 def humanize_count(x, s, p, places=1):
     output = []

@@ -19,9 +19,9 @@
 
 from gi.repository import Soup
 from BeautifulSoup import BeautifulStoneSoup
+
 from gpapers.importer import SimpleWebSearchProvider
 from gpapers.gPapers.models import Paper
-
 from gpapers.logger import *
 
 QUERY_STRING = 'http://dfr.jstor.org/sru/?version=1.1&' + \
