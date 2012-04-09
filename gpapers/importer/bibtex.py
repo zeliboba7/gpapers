@@ -1,17 +1,41 @@
 # coding: utf8
+
+#    gPapers
+#    Copyright (C) 2007-2009 Derek Anderson
+#                  2012      Derek Anderson and Marcel Stimberg
+#
+# This file is part of gPapers.
+#
+#    gPapers is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    gPapers is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with gPapers.  If not, see <http://www.gnu.org/licenses/>.
+#
+# This file is based on code by Matthew Brett (http://pastebin.com/ZzU19NLJ),
+# published under a simplified BSD license.
+
+# -- begin of pyparsing code
+#  Pyparsing parser for BibTeX files
+#
+#  A standalone parser using pyparsing.
+#
+#  pyparsing has a simple and expressive syntax so the grammar is easy to read and
+#  write.
+#
+#  Matthew Brett 2010
+#  Simplified BSD license
+
 import re
 from gpapers.logger import log_info, log_debug
 import pprint
-""" Pyparsing parser for BibTeX files
-
-A standalone parser using pyparsing.
-
-pyparsing has a simple and expressive syntax so the grammar is easy to read and
-write.
-
-Matthew Brett 2010
-Simplified BSD license
-"""
 
 from pyparsing import (Regex, Suppress, ZeroOrMore, Group, Optional, Forward,
                        SkipTo, CaselessLiteral, Dict)
@@ -123,31 +147,7 @@ bibfile = ZeroOrMore(definitions)
 def parse_str(str):
     return bibfile.parseString(str)
 
-if __name__ == '__main__':
-    # Run basic test
-    txt = """
-@article{10.1371/journal.pone.0020409,
-    author = {Tkačik, Gašper AND Garrigan, Patrick AND Ratliff, Charles AND Milčinski, Grega AND Klein, Jennifer M. AND Seyfarth, Lucia H. AND Sterling, Peter AND Brainard, David H. AND Balasubramanian, Vijay},
-    journal = {PLoS ONE},
-    publisher = {Public Library of Science},
-    title = {Natural {I}mages from the Birthplace of the Human Eye},
-    year = {2011},
-    month = {06},
-    volume = {6},
-    url = {http://dx.doi.org/10.1371%2Fjournal.pone.0020409},
-    pages = {e20409},
-    abstract = {
-        <p>Here we introduce a database of calibrated natural images publicly available through an easy-to-use web interface. Using a Nikon D70 digital SLR camera, we acquired about <inline-formula><inline-graphic xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="info:doi/10.1371/journal.pone.0020409.e001" mimetype="image" xlink:type="simple"/></inline-formula> six-megapixel images of Okavango Delta of Botswana, a tropical savanna habitat similar to where the human eye is thought to have evolved. Some sequences of images were captured unsystematically while following a baboon troop, while others were designed to vary a single parameter such as aperture, object distance, time of day or position on the horizon. Images are available in the raw RGB format and in grayscale. Images are also available in units relevant to the physiology of human cone photoreceptors, where pixel values represent the expected number of photoisomerizations per second for cones sensitive to long (L), medium (M) and short (S) wavelengths. This database is distributed under a Creative Commons Attribution-Noncommercial Unported license to facilitate research in computer vision, psychophysics of perception, and visual neuroscience.</p>
-      },
-    number = {6},
-    doi = {10.1371/journal.pone.0020409}
-}        
-"""
-    pp = pprint.PrettyPrinter(indent=4)
-
-    pp.pprint(mydict)
-
-p_bibtex = re.compile('[@][a-z]+[\s]*{(.*)}', re.IGNORECASE | re.DOTALL)
+# -- end of pyparsing code
 
 def latex2unicode(s):
     """
