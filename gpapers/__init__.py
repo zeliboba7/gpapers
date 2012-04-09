@@ -33,6 +33,7 @@ import traceback
 
 from gi.repository import Gio
 from gi.repository import GObject
+from gi.repository import GLib
 from gi.repository import Gdk
 from gi.repository import Gtk
 from gi.repository import GdkPixbuf
@@ -577,12 +578,14 @@ class MainGUI:
         self.init_bookmark_pane()
         self.init_pdf_preview_pane()
         self.refresh_left_pane()
+
         # make sure the GUI updates on database changes
         def receiver_wrapper(sender, **kwargs):
-            # Make sure this gets only called from the main thread
-            GObject.idle_add(lambda x : self.handle_library_updates, ())
+            self.handle_library_updates()
+
         post_save.connect(receiver_wrapper, sender=Paper, weak=False)
         post_delete.connect(receiver_wrapper, sender=Paper, weak=False)
+
         self.main_window.show()
 
     def init_busy_notifier(self):
