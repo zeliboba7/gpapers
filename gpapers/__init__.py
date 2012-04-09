@@ -66,7 +66,7 @@ from django.template import defaultfilters
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
-import gpapers.deseb
+import deseb
 from gpapers.gPapers.models import *
 import gpapers.importer as importer
 
