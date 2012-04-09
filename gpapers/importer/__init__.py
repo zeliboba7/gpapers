@@ -37,7 +37,6 @@ from pyPdf import PdfFileReader
 #from gPapers.models import *
 from django.template import defaultfilters
 import BeautifulSoup
-from gpapers import openanything
 
 from gpapers.logger import *
 import bibtex
@@ -291,72 +290,6 @@ def _import_unknown_citation(data, orig_url, paper=None):
         #Combine the base URL with the PDF link (necessary for relative URLs)
         pdf_link = urlparse.urljoin(orig_url, pdf_link)
         return import_citation(pdf_link)
-
-
-def find_and_attach_pdf(paper, urls, visited_urls=set()):
-
-    # search for a PDF linked directly
-    for url in urls:
-        if url.find('?') > 0: url = url[ : url.find('?') ]
-        if url.lower().endswith('pdf'):
-            log_debug('found PDF link: %s' % url)
-            visited_urls.add(url)
-            params = openanything.fetch(url)
-            if params['status'] == 200 or params['status'] == 302 :
-                if params['data'].startswith('%PDF'):
-                    # we have a live one!
-                    try:
-                        filename = params['url'][ params['url'].rfind('/') + 1 : ]
-                        log_info('importing paper: %s' % filename)
-                        paper.save_file(defaultfilters.slugify(filename.replace('.pdf', '')) + '.pdf', params['data'])
-                        paper.save()
-                        return True
-                    except:
-                        traceback.print_exc()
-
-    for url in urls:
-        visited_urls.add(url)
-        params = openanything.fetch(url)
-        if params['status'] == 200 or params['status'] == 302 :
-            if params['data'].startswith('%PDF'):
-                # we have a live one!
-                try:
-                    filename = params['url'][ params['url'].rfind('/') + 1 : ]
-                    log_info('importing paper: %s' % filename)
-                    paper.save_file(defaultfilters.slugify(filename.replace('.pdf', '')) + '.pdf', params['data'])
-                    paper.save()
-                    return True
-                except:
-                    traceback.print_exc()
-            else:
-                soup = BeautifulSoup.BeautifulSoup(params['data'])
-                promising_links = set()
-                for a in soup.findAll('a', href=True):
-                    if len(a.contents) > 8: continue
-                    web_dir_root = params['url'][: params['url'].find('/', 8) ]
-                    web_dir_current = params['url'][: params['url'].rfind('/') ]
-                    href = a['href']
-                    if not href.lower().startswith('http'):
-                        if href.startswith('/'):
-                            href = web_dir_root + href
-                        else:
-                            href = web_dir_current + '/' + href
-                    x = href
-                    if x.find('?') > 0: x = x[ : x.find('?') ]
-                    if x.lower().endswith('pdf'):
-                        if href not in visited_urls:
-                            log_info('found PDF link: %s' % a)
-                            promising_links.add(href)
-                            continue
-                    for c in a.contents:
-                        c = str(c).lower()
-                        if c.find('pdf') != -1:
-                            if href not in visited_urls:
-                                log_info('found PDF link: %s' % a)
-                                promising_links.add(href)
-                                continue
-                if promising_links: print promising_links
-                if find_and_attach_pdf(paper, list(promising_links), visited_urls=visited_urls): return
 
 
 def get_bibtex_for_doi(doi, callback):
