@@ -19,7 +19,6 @@ import hashlib, os, re, traceback
 from django.db import models
 import django.core.files.base
 from gpapers import desktop
-import pyPdf
 
 from gpapers.logger import log_debug
 

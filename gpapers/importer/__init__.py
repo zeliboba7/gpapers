@@ -17,11 +17,23 @@
 #    You should have received a copy of the GNU General Public License
 #    along with gPapers.  If not, see <http://www.gnu.org/licenses/>.
 
-import commands, dircache, getopt, math, os, re, string, sys, thread, threading, time, traceback
+import commands
+import dircache
+import getopt
+import math
+import os
+import re
+import string
+import sys
+import thread
+import threading
+import time
+import traceback
 from datetime import date, datetime, timedelta
 from time import strptime
 from htmlentitydefs import name2codepoint as n2cp
-import urllib, urlparse
+import urllib
+import urlparse
 import hashlib
 
 import gi
@@ -31,10 +43,6 @@ from gi.repository import Gdk
 from gi.repository import Gtk
 from gi.repository import Pango
 from gi.repository import Soup
-
-from pyPdf import PdfFileReader
-
-#from gPapers.models import *
 from django.template import defaultfilters
 import BeautifulSoup
 

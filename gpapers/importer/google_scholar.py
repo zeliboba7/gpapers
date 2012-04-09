@@ -17,10 +17,12 @@
 #    You should have received a copy of the GNU General Public License
 #    along with gPapers.  If not, see <http://www.gnu.org/licenses/>.
 
-import urllib, hashlib, random, traceback
+import urllib
+import hashlib
+import random
+import traceback
 
 from gi.repository import Soup  # @UnresolvedImport
-
 import BeautifulSoup
 from django.template import defaultfilters
 

@@ -20,11 +20,10 @@
 import urllib
 
 import BeautifulSoup
+from BeautifulSoup import BeautifulStoneSoup
 from gi.repository import Soup  # @UnresolvedImport
 
 from gpapers.logger import log_debug, log_info, log_error
-from BeautifulSoup import BeautifulStoneSoup
-
 from gpapers.importer import WebSearchProvider, soup_session
 
 BASE_URL = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
