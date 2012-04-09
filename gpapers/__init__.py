@@ -498,8 +498,16 @@ class MainGUI:
         dialog.show_all()
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            threading.Thread(target=import_documents_via_filenames,
-                             args=(dialog.get_filenames(),)).start()
+
+            def mycallback(file_object, asyncresult, user_data):
+                # Get the actual file content 
+                file_content = file_object.load_contents_finish(asyncresult)[1]
+
+                self.document_imported(paper_data=file_content, paper_info=None,
+                                       user_data=user_data)
+
+            import_documents_via_filenames(dialog.get_filenames(),
+                                           mycallback)
         dialog.destroy()
 
     def import_bibtex_dialog(self, o):
