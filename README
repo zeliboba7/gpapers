@@ -2,7 +2,7 @@ Dependencies
 ============
 
 gPapers is currently developed and tested under Ubuntu 12.04 and depends on the
-following packages:
+following packages (giving the current version numbers in Ubuntu 12.04):
 
 gir1.2-glib-2.0: 1.32.0-1
 gir1.2-gtk-3.0: 3.4.0-0ubuntu2
@@ -12,3 +12,16 @@ gir1.2-poppler-0.18: 0.18.4-1ubuntu2
 gir1.2-soup-2.4: 2.38.0-0ubuntu1
 python-django: 1.3.1-4ubuntu1
 python-pdfminer: 20110515+dfsg-1
+python-beautifulsoup: 3.2.0-2build1
+
+In addition, gPapers contains code from the following sources:
+
+deseb
+    http://code.google.com/p/deseb/ 
+    Written by Derek Anderson, published under a BSD license
+desktop
+    http://pypi.python.org/pypi/desktop
+    Written by Paul Boddie, published under LGPLv3
+pyparsing parser for BibTeX
+    http://pastebin.com/ZzU19NLJ
+    Written by Matthew Brett, published under a simplified BSD license
