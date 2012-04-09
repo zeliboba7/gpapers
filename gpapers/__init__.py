@@ -613,6 +613,7 @@ class MainGUI:
             for x in self.active_threads.items():
                 self.treeview_running_tasks_model.append(x)
             if not self.busy_notifier_is_running:
+                log_debug('Setting spinning busy notifier')
                 self.ui.get_object('busy_notifier').set_from_file(os.path.join(BASE_DIR, 'icons', 'process-working.gif'))
                 self.busy_notifier_is_running = True
                 self.ui.get_object('treeview_running_tasks').show()
@@ -1973,7 +1974,6 @@ class MainGUI:
                            self.refresh_my_library_filter_pane)
 
     def refresh_middle_pane_from_my_library(self, refresh_library_filter_pane=True):
-        self.active_threads[ str(thread.get_ident()) ] = 'searching local library...'
         try:
             rows = []
             my_library_filter_pane = self.ui.get_object('my_library_filter_pane')
@@ -2090,8 +2090,6 @@ class MainGUI:
             self.refresh_my_library_count()
         except:
             traceback.print_exc()
-        if self.active_threads.has_key(str(thread.get_ident())):
-            del self.active_threads[ str(thread.get_ident()) ]
 
     def refresh_my_library_count(self):
         selection = self.ui.get_object('left_pane_selection')
