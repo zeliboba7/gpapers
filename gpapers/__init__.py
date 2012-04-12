@@ -298,16 +298,20 @@ def render_paper_rating_attribute(column, cell, model, iter, data):
     paper = model.get_value(iter, 0)
     cell.value = paper.rating
 
-def render_paper_document_attribute(column, cell, model, iter, data):
+
+def render_paper_document_attribute(column, cell, model, iter, widget):
     '''
     This function is used by the view of the list of papers to display a little
     icon for papers that have the text in the library.
     '''
     paper = model.get_value(iter, 0)
-    
+
     if paper.full_text and os.path.isfile(paper.full_text.path):
-        icon = Gtk.render_icon(Gtk.STOCK_DND, Gtk.IconSize.MENU)
-        cell.set_property('pixbuf', icon)
+        icon = widget.render_icon(Gtk.STOCK_DND, Gtk.IconSize.MENU)
+    else:
+        icon = None
+
+    cell.set_property('pixbuf', icon)
 
 class MainGUI:
 
@@ -1124,6 +1128,8 @@ class MainGUI:
         column.set_title('Title')
         column.set_min_width(-1)
         renderer = Gtk.CellRendererPixbuf()
+        column.set_cell_data_func(renderer, render_paper_document_attribute,
+                                  middle_top_pane)
         column.pack_start(renderer, False)
         renderer = Gtk.CellRendererText()
         column.pack_start(renderer, True)
