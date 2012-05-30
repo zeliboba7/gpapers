@@ -139,10 +139,6 @@ def make_all_columns_resizeable_clickable_ellipsize(columns):
                 renderer.set_property('ellipsize', Pango.EllipsizeMode.END)
 
 
-def fetch_citation_via_middle_top_pane_row(row):
-    t = thread.start_new_thread(import_citation_via_middle_top_pane_row, (row,))
-
-
 def fetch_citations_via_urls(urls):
     log_info('trying to fetch: %s' % str(urls))
     t = thread.start_new_thread(import_citations, (urls,))
@@ -205,73 +201,10 @@ def import_documents_via_filenames(filenames, callback):
 
     main_gui.refresh_middle_pane_search()
 
-
-def paper_info_received(paper):
-    paper.save()
-    importer.import_citation(paper.import_url, paper=paper,
-                             callback=main_gui.refresh_middle_pane_search)
-
-
-def import_citation_via_middle_top_pane_row(row):
-    # id, authors, title, journal, year, rating, abstract, icon, import_url, doi, created, updated, empty_str, pubmed_id
-
-    paper_id = row[0]
-    authors = row[1]
-    title = row[2]
-    journal = row[3]
-    year = row[4]
-    abstract = row[6]
-    import_url = row[8]
-    doi = row[9]
-    pubmed_id = row[13]
-    data = row[14]
-    provider = row[15]
-    if doi and not import_url:
-        import_url = 'http://dx.doi.org/' + doi
-    importer.get_or_create_paper_via(id=paper_id, doi=doi,
-                                     pubmed_id=pubmed_id,
-                                     import_url=import_url,
-                                     title=title, data=data,
-                                     provider=provider,
-                                     callback=paper_info_received)
-
-
 def row_from_dictionary(info, provider=None):
     assert info is not None
 
-    created = info.get('created')
-    updated = info.get('updated')
-    try:
-        created = created.strftime('%Y-%m-%d')
-    except:
-        pass
-    try:
-        updated = updated.strftime('%Y-%m-%d')
-    except:
-        pass
-
-    row = (
-            info.get('id', -1), # paper id 
-            pango_escape(', '.join([author for author in
-                                    info.get('authors', [])])), # authors 
-            pango_escape(info.get('title') or ''), # title 
-            pango_escape(info.get('journal') or ''), # journal 
-            info.get('year'), # year 
-            info.get('rating', 0), # ranking
-            info.get('abstract'), # abstract
-            info.get('icon'), # icon
-            info.get('import_url'), # import_url
-            info.get('doi'), # doi
-            created, # created
-            updated, # updated
-            '', # empty_str
-            info.get('pubmed_id'), # pubmed_id
-            info.get('data'),
-            provider
-    )
-
-    return row
-
+    return (VirtualPaper(info, provider), )
 
 def paper_from_dictionary(paper_info, paper=None):
     '''
@@ -329,6 +262,52 @@ def paper_from_dictionary(paper_info, paper=None):
 
     return paper
 
+def render_paper_text_attribute(column, cell, model, iter, attribute):
+    '''
+    This function is used by the view of the list of papers to extract an 
+    attribute from the paper object.
+    '''
+    paper = model.get_value(iter, 0)
+    
+    # special case some attributes that are not direct attributes of the paper object
+    if attribute == 'Authors':
+        authors = ', '.join([ author.name for author in paper.get_authors_in_order() ])
+        cell.set_property('text', authors)
+    elif attribute == 'Journal':
+        if paper.source:
+            journal = paper.source.name
+        else:
+            journal = ''
+        cell.set_property('text', journal)
+    elif attribute == 'Year':
+        if paper.source and paper.source.publication_date:
+            pub_year = str(paper.source.publication_date.year)
+        else:
+            pub_year = ''
+        cell.set_property('text', pub_year)
+    else:
+        # Set the text to the value of the respective attribute
+        cell.set_property('text', str(getattr(paper, attribute.lower())))
+
+def render_paper_rating_attribute(column, cell, model, iter, data):
+    '''
+    This function is used by the view of the list of papers to extract the 
+    rating from a paper object and pass it to the progress bar renderer used
+    to display it
+    '''
+    paper = model.get_value(iter, 0)
+    cell.value = paper.rating
+
+def render_paper_document_attribute(column, cell, model, iter, data):
+    '''
+    This function is used by the view of the list of papers to display a little
+    icon for papers that have the text in the library.
+    '''
+    paper = model.get_value(iter, 0)
+    
+    if paper.full_text and os.path.isfile(paper.full_text.path):
+        icon = Gtk.render_icon(Gtk.STOCK_DND, Gtk.IconSize.MENU)
+        cell.set_property('pixbuf', icon)
 
 class MainGUI:
 
@@ -1133,54 +1112,34 @@ class MainGUI:
 
     def init_middle_top_pane(self):
         middle_top_pane = self.ui.get_object('middle_top_pane')
-        # id, authors, title, journal, year, rating, abstract, icon, import_url, doi, created, updated, empty_str, pubmed_id, data, search search_providers
-        self.middle_top_pane_model = Gtk.ListStore(int, str, str, str, str, int, str, GdkPixbuf.Pixbuf, str, str, str, str, str, str, object, object)
+        # We directly save Paper objects in the model
+        # TODO: Column sorting no longer works...
+        self.middle_top_pane_model = Gtk.ListStore(object)
         middle_top_pane.set_model(self.middle_top_pane_model)
         middle_top_pane.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
-        middle_top_pane.connect('button-press-event', self.handle_middle_top_pane_button_press_event)
-
-        #middle_top_pane.append_column( Gtk.TreeViewColumn("", Gtk.CellRendererToggle(), active=7) )
-        #column = Gtk.TreeViewColumn("Title", Gtk.CellRendererText(), markup=2)
-        #column.set_min_width(256)
-        #column.set_expand(True)
-        #middle_top_pane.append_column( column )
+        middle_top_pane.connect('button-press-event',
+                                self.handle_middle_top_pane_button_press_event)
 
         column = Gtk.TreeViewColumn()
         column.set_title('Title')
         column.set_min_width(-1)
         renderer = Gtk.CellRendererPixbuf()
         column.pack_start(renderer, False)
-        column.add_attribute(renderer, 'pixbuf', 7)
         renderer = Gtk.CellRendererText()
         column.pack_start(renderer, True)
-        column.add_attribute(renderer, 'markup', 2)
-        column.set_sort_column_id(2)
+        column.set_cell_data_func(renderer, render_paper_text_attribute, 
+                                  'Title')
+                  
         middle_top_pane.append_column(column)
-        column = Gtk.TreeViewColumn("Authors", Gtk.CellRendererText(), markup=1)
-        column.set_sort_column_id(1)
-        column.set_min_width(-1)
-        column.set_expand(True)
-        middle_top_pane.append_column(column)
-        column = Gtk.TreeViewColumn("Journal", Gtk.CellRendererText(), markup=3)
-        column.set_sort_column_id(3)
-        column.set_min_width(-1)
-        column.set_expand(True)
-        middle_top_pane.append_column(column)
-        column = Gtk.TreeViewColumn("Year", Gtk.CellRendererText(), markup=4)
-        column.set_sort_column_id(4)
-        column.set_min_width(-1)
-        column.set_expand(False)
-        middle_top_pane.append_column(column)
-        column = Gtk.TreeViewColumn("Rating", Gtk.CellRendererProgress(), value=5, text=12)
-        column.set_sort_column_id(5)
-        column.set_min_width(-1)
-        column.set_expand(False)
-        middle_top_pane.append_column(column)
-        column = Gtk.TreeViewColumn("Imported", Gtk.CellRendererText(), markup=10)
-        column.set_sort_column_id(10)
-        column.set_min_width(80)
-        column.set_expand(False)
-        middle_top_pane.append_column(column)
+        for attribute in ['Authors', 'Journal', 'Year', 'Created']:
+            column = Gtk.TreeViewColumn(attribute)
+            column.set_min_width(-1)
+            renderer = Gtk.CellRendererText()
+            column.pack_start(renderer, True)
+            column.set_cell_data_func(renderer, render_paper_text_attribute,
+                                      attribute)
+            column.set_expand(True)
+            middle_top_pane.append_column(column)
 
         make_all_columns_resizeable_clickable_ellipsize(middle_top_pane.get_columns())
 
@@ -1338,23 +1297,21 @@ class MainGUI:
                 path, col, cellx, celly = pthinfo
                 treeview.grab_focus()
                 treeview.set_cursor(path, col, 0)
-                paper_id = self.middle_top_pane_model.get_value(self.middle_top_pane_model.get_iter(path), 0)
-                if paper_id >= 0: #len(path)==2:
-                    menu = Gtk.Menu()
-                    paper = Paper.objects.get(id=paper_id)
-                    if paper and paper.full_text and os.path.isfile(paper.full_text.path):
-                        button = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_OPEN, None)
-                        button.connect('activate', lambda x: paper.open())
-                        menu.append(button)
-                    button = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_EDIT, None)
-                    button.connect('activate', lambda x: PaperEditGUI(paper.id))
+                paper = self.middle_top_pane_model.get_value(self.middle_top_pane_model.get_iter(path), 0)
+                menu = Gtk.Menu()
+                if paper and paper.full_text and os.path.isfile(paper.full_text.path):
+                    button = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_OPEN, None)
+                    button.connect('activate', lambda x: paper.open())
                     menu.append(button)
-                    button = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_DELETE, None)
-                    button.connect('activate', lambda x: self.delete_papers([paper.id]))
-                    menu.append(button)
-                    menu.show_all()
-                    menu.attach_to_widget(treeview, None)
-                    menu.popup(None, None, None, None, event.button, event.get_time())
+                button = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_EDIT, None)
+                button.connect('activate', lambda x: PaperEditGUI(paper.id))
+                menu.append(button)
+                button = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_DELETE, None)
+                button.connect('activate', lambda x: self.delete_papers([paper.id]))
+                menu.append(button)
+                menu.show_all()
+                menu.attach_to_widget(treeview, None)
+                menu.popup(None, None, None, None, event.button, event.get_time())
             return True
 
     def handle_author_filter_button_press_event(self, treeview, event):
@@ -1534,6 +1491,10 @@ class MainGUI:
         playlist.save()
         self.refresh_left_pane()
 
+    def import_citation_via_middle_top_pane_row(self, row):
+        paper_obj = row[0]
+        importer.get_or_create_paper_via(paper_obj, callback=self.document_imported)
+
     def select_middle_top_pane_item(self, selection):
         liststore, rows = selection.get_selected_rows()
         self.paper_information_pane_model.clear()
@@ -1548,24 +1509,26 @@ class MainGUI:
         if not rows or len(rows) == 0:
             self.update_bookmark_pane_from_paper(None)
         elif len(rows) == 1:
-            log_debug('liststore[row]: %s' % str(liststore[rows[0]]))
-            log_debug('liststore[row]: %s' % [str(x) for x in liststore[rows[0]]])
-            try:
-                self.displayed_paper = paper = Paper.objects.get(id=liststore[rows[0]][0])
-            except:
-                paper = None
-            if liststore[rows[0]][2]:
-                self.paper_information_pane_model.append(('<b>Title:</b>', liststore[rows[0]][2] ,))
-            if liststore[rows[0]][1]:
-                self.paper_information_pane_model.append(('<b>Authors:</b>', liststore[rows[0]][1] ,))
-            if liststore[rows[0]][3]:
-                self.paper_information_pane_model.append(('<b>Journal:</b>', liststore[rows[0]][3] ,))
-            if liststore[rows[0]][9]:
-                self.paper_information_pane_model.append(('<b>DOI:</b>', pango_escape(liststore[rows[0]][9]) ,))
-            if liststore[rows[0]][13]:
-                self.paper_information_pane_model.append(('<b>PubMed:</b>', pango_escape(liststore[rows[0]][13]) ,))
-            if liststore[rows[0]][8]:
-                self.paper_information_pane_model.append(('<b>Import URL:</b>', pango_escape(liststore[rows[0]][8]) ,))
+            self.displayed_paper = paper = liststore[rows[0]][0]
+            if paper.title:
+                self.paper_information_pane_model.append(('<b>Title:</b>',
+                                                          paper.title ,))
+            if liststore[rows[0]][0].authors:
+                author_str = ', '.join([ author.name for author in
+                                        paper.get_authors_in_order() ])
+                self.paper_information_pane_model.append(('<b>Authors:</b>',
+                                                          author_str,))
+#            if liststore[rows[0]][3]:
+#                self.paper_information_pane_model.append(('<b>Journal:</b>', liststore[rows[0]][3] ,))
+            if paper.doi:
+                self.paper_information_pane_model.append(('<b>DOI:</b>',
+                                                          pango_escape(paper.doi) ,))
+            if paper.pubmed_id:
+                self.paper_information_pane_model.append(('<b>PubMed:</b>',
+                                                          pango_escape(paper.pubmed_id) ,))
+            if paper.import_url:
+                self.paper_information_pane_model.append(('<b>Import URL:</b>',
+                                                          pango_escape(paper.import_url) ,))
             status = []
             if paper and paper.full_text and os.path.isfile(paper.full_text.path):
                 status.append('Full text saved in local library.')
@@ -1577,41 +1540,39 @@ class MainGUI:
                 self.paper_information_pane_model.append(('<b>Status:</b>', pango_escape('\n'.join(status)) ,))
 #            if paper.source:
 #                description.append( 'Source:  %s %s (pages: %s)' % ( str(paper.source), paper.source_session, paper.source_pages ) )
-            if liststore[rows[0]][6]:
-                self.paper_information_pane_model.append(('<b>Abstract:</b>', pango_escape(liststore[rows[0]][6]) ,))
+            if paper.abstract:
+                self.paper_information_pane_model.append(('<b>Abstract:</b>',
+                                                          pango_escape(paper.abstract) ,))
 #            description.append( '' )
 #            description.append( 'References:' )
 #            for ref in paper.reference_set.all():
 #                description.append( ref.line )
             #self.ui.get_object('paper_information_pane').get_buffer().set_text( '\n'.join(description) )            
 
-            if liststore[rows[0]][8] or liststore[rows[0]][9]:
+            if paper.doi or paper.import_url:
                 log_debug('URL or DOI exists')
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_HOME)
                 button.set_tooltip_text('Open this URL in your browser...')
-                url = liststore[rows[0]][8]
+                url = paper.import_url
                 if not url:
-                    url = 'http://dx.doi.org/' + liststore[rows[0]][9]
+                    url = 'http://dx.doi.org/' + paper.doi
                 button.connect('clicked', lambda x: desktop.open(url))
                 paper_information_toolbar.insert(button, -1)
-                if paper:
+                if paper.id != -1:
                     button = Gtk.ToolButton(stock_id=Gtk.STOCK_REFRESH)
                     button.set_tooltip_text('Re-add this paper to your library...')
-                    button.connect('clicked', lambda x: fetch_citation_via_middle_top_pane_row(liststore[rows[0]]))
+                    
+                    button.connect('clicked', lambda x: self.import_citation_via_middle_top_pane_row(liststore[rows[0]]))
                     paper_information_toolbar.insert(button, -1)
 
-            source = liststore[rows[0]][15]
-            log_debug('Source: %s' % source)
-            if not paper and source is not None and source != 'local':  # This is a search result
+            if paper.id == -1 and hasattr(paper, 'provider'):  # This is a search result
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_ADD)
                 button.set_tooltip_text('Add this paper to your library...')
-                provider = self.search_providers[source]
                 button.connect('clicked',
-                               lambda x: provider.import_paper_after_search(liststore[rows[0]][14],
-                                                                            self.document_imported))
+                               lambda x: paper.provider.import_paper_after_search(paper.data,
+                                                                                  self.document_imported))
                 paper_information_toolbar.insert(button, -1)
-
-            if paper:
+            elif paper.id != -1:
                 importable_references = set()
                 references = paper.reference_set.order_by('id')
 #                self.paper_information_pane_model.append(( '<b>References:</b>', '\n'.join( [ '<i>'+ str(i) +':</i> '+ references[i].line_from_referencing_paper for i in range(0,len(references)) ] ) ,))
@@ -1691,8 +1652,9 @@ class MainGUI:
 
             downloadable_paper_urls = set()
             for row in rows:
-                if liststore[row][8] and liststore[row][0] == -1:
-                    downloadable_paper_urls.add(liststore[row][8])
+                paper = liststore[row][0]
+                if paper.import_url and paper.id == -1:
+                    downloadable_paper_urls.add(paper.import_url)
             if len(downloadable_paper_urls):
                 self.paper_information_pane_model.append(('<b>Number of new papers:</b>', len(downloadable_paper_urls) ,))
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_ADD)
@@ -1702,8 +1664,8 @@ class MainGUI:
 
             selected_valid_paper_ids = []
             for row in rows:
-                if liststore[row][0] != -1:
-                    selected_valid_paper_ids.append(liststore[row][0])
+                if liststore[row][0].id != -1:
+                    selected_valid_paper_ids.append(liststore[row][0].id)
             log_debug('selected_valid_paper_ids: %s' % str(selected_valid_paper_ids))
             if len(selected_valid_paper_ids):
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_REMOVE)
@@ -2085,8 +2047,8 @@ class MainGUI:
                     None
                 ))
             self.middle_top_pane_model.clear()
-            for row in rows:
-                self.middle_top_pane_model.append(row)
+            for paper in papers:
+                self.middle_top_pane_model.append((paper, ))
             self.refresh_my_library_count()
         except:
             traceback.print_exc()
@@ -2149,7 +2111,7 @@ class MainGUI:
                 pass
 
             # Add information to table 
-            rows.append(row_from_dictionary(info, search_provider.label))
+            rows.append(row_from_dictionary(info, search_provider))
 
         self.middle_top_pane_model.clear()
         for row in rows:

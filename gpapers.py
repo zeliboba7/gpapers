@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
 #    gPapers
 #    Copyright (C) 2007-2009 Derek Anderson
