@@ -16,10 +16,12 @@
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import hashlib, os, re, traceback
+from datetime import datetime
+
 from django.db import models
 import django.core.files.base
-from gpapers import desktop
 
+from gpapers import desktop
 from gpapers.logger import log_debug
 
 class Publisher(models.Model):
@@ -264,3 +266,73 @@ class Playlist(models.Model):
         return self.title
 
 
+###############################################################################
+# "virtual" classes, used for non-existing papers, etc. to represent search
+# results before they are imported
+###############################################################################
+
+class VirtualAuthor(object):
+
+    def __init__(self, name):
+        self.name = name
+
+
+class VirtualSource(object):
+
+    class SimpleDate(object):
+        def __init__(self):
+            self.year = None
+
+    def __init__(self):
+        self.name = None
+        self.publication_date = VirtualSource.SimpleDate()
+
+
+class VirtualPaper(object):
+    ''' An object that can be treated for table display purposes as if it were
+    an already existing `Paper` object, i.e. it provides a title attribute etc.
+    '''
+
+    class VirtualSet(object):
+        '''
+        dummy class needed for faking the reference/citation relation
+        '''
+        @staticmethod
+        def order_by(name):
+            return []
+
+    def __init__(self, paper_info, provider=None):
+        '''
+        Create a new object from the given dictionary `paper_info`
+        '''
+
+        self.id = -1
+        self.provider = provider  # The origin of this search result
+        self.authors = []
+        self.source = VirtualSource()
+        self.full_text = None
+        self.abstract = None
+        self.title = None
+        self.created = datetime.today()
+        self.reference_set = VirtualPaper.VirtualSet()
+        self.citation_set = VirtualPaper.VirtualSet()
+        self.bookmark_set = VirtualPaper.VirtualSet()
+        self.notes = ''
+        self.doi = None
+        self.import_url = None
+        self.pubmed_id = None
+
+        for key in paper_info.keys():
+            # take care of the more complex fields
+            if key == 'authors':
+                self.authors = [VirtualAuthor(author) for author in
+                                paper_info['authors']]
+            elif key == 'journal':
+                self.source.name = paper_info['journal']
+            elif key == 'year':
+                self.source.publication_date.year = paper_info['year']
+            else:
+                self.__setattr__(key, paper_info[key])
+
+    def get_authors_in_order(self):
+        return self.authors

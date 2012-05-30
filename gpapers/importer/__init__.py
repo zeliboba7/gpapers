@@ -47,6 +47,7 @@ from django.template import defaultfilters
 import BeautifulSoup
 
 from gpapers.logger import *
+from gpapers.gPapers.models import Paper
 import bibtex
 
 active_threads = None
@@ -91,17 +92,20 @@ def _substitute_entity(match):
             return match.group()
 
 
-def get_or_create_paper_via(callback, id=None, doi=None, pubmed_id=None,
-                            import_url=None, title=None, full_text_md5=None,
-                            data=None, provider=None):
-    """Tries to look up a paper by various forms of id, from most specific to
-    least. Can also be used to fill in the data for a search result -- then
-    data and search_provider have to be specified."""
-    #print id, doi, pubmed_id, import_url, title, full_text_md5
+def get_or_create_paper_via(paper_obj, callback, full_text_md5=None):
+
+    paper_id = paper_obj.id
+    doi = paper_obj.doi
+    pubmed_id = paper_obj.pubmed_id
+    import_url = paper_obj.import_url
+    title = paper_obj.title
+    provider = paper_obj.provider
+    data = paper_obj.data
+
     paper = None
 
-    if id >= 0:
-        try: paper = Paper.objects.get(id=id)
+    if paper_id >= 0:
+        try: paper = Paper.objects.get(id=paper_id)
         except: pass
 
     if doi:
@@ -143,22 +147,22 @@ def get_or_create_paper_via(callback, id=None, doi=None, pubmed_id=None,
 
     if not paper:
         # it looks like we haven't seen this paper before...
-        if not doi:
-            doi = ''
-        if not pubmed_id:
-            pubmed_id = ''
-        if not import_url:
-            import_url = ''
-        if not title:
-            title = ''
-        paper = Paper.objects.create(doi=doi, pubmed_id=pubmed_id,
-                                     import_url=import_url, title=title)
-
-    if provider:
-        # Get the paper from the search provider
-        provider.import_paper_after_search(data, paper=paper, callback=callback)
-    else:
-        callback(paper)
+        if provider:
+            # Get the paper from the search provider
+            provider.import_paper_after_search(data, callback=callback)
+        else:
+            if not doi:
+                doi = ''
+            if not pubmed_id:
+                pubmed_id = ''
+            if not import_url:
+                import_url = ''
+            if not title:
+                title = ''
+            paper = Paper.objects.create(doi=doi, pubmed_id=pubmed_id,
+                                         import_url=import_url, title=title)
+            # we are done, call the callback
+            callback(paper)
 
 
 #TODO: Refactor import_pdf into a new function 
