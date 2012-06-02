@@ -1162,9 +1162,8 @@ class MainGUI:
 
     def handle_middle_top_pane_row_activated(self, treeview, path, view_column):
         liststore, rows = treeview.get_selection().get_selected()
-        paper_id = treeview.get_model().get_value(treeview.get_model().get_iter(path), 0)
+        paper = treeview.get_model().get_value(treeview.get_model().get_iter(path), 0)
         try:
-            paper = Paper.objects.get(id=paper_id)
             paper.open()
         except:
             traceback.print_exc()
