@@ -30,7 +30,7 @@ from gpapers.logger import log_debug, log_info, log_error
 
 # A DOI consists of a numeric prefix starting with "10." followed by "/" and
 # a more or less arbitrary suffix
-p_doi = re.compile('\s(10.[0-9]+/[^/].+)\s', re.IGNORECASE)
+p_doi = re.compile('[\s:](10.[0-9]+/[^/].+)\s', re.IGNORECASE)
 
 
 def get_paper_info_from_pdf(data):
@@ -94,5 +94,6 @@ def get_paper_info_from_pdf(data):
     device.close()
     content.close()
 
+    log_debug('Exctracted paper_info from PDF: %s' % paper_info)
 
     return paper_info
