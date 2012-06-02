@@ -262,6 +262,7 @@ def paper_from_dictionary(paper_info, paper=None):
 
     return paper
 
+
 def render_paper_text_attribute(column, cell, model, iter, attribute):
     '''
     This function is used by the view of the list of papers to extract an 
@@ -289,6 +290,7 @@ def render_paper_text_attribute(column, cell, model, iter, attribute):
         # Set the text to the value of the respective attribute
         cell.set_property('text', str(getattr(paper, attribute.lower())))
 
+
 def render_paper_rating_attribute(column, cell, model, iter, data):
     '''
     This function is used by the view of the list of papers to extract the 
@@ -312,6 +314,7 @@ def render_paper_document_attribute(column, cell, model, iter, widget):
         icon = None
 
     cell.set_property('pixbuf', icon)
+
 
 class MainGUI:
 
