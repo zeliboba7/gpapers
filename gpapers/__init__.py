@@ -318,7 +318,6 @@ def render_paper_document_attribute(column, cell, model, iter, widget):
 
 class MainGUI:
 
-    current_middle_top_pane_refresh_thread_ident = None
     active_threads = {}
 
     def bibtex_received(self, bibtex_data, doi):
@@ -624,8 +623,8 @@ class MainGUI:
         self.ui.get_object('menuitem_about').connect('activate', self.show_about_dialog)
 
     def init_search_box(self):
-        # Check the search box for changes every 0.5 seconds
-        GObject.timeout_add(500, lambda x: self.middle_pane_search_changed(),
+        # Check the search box for changes every 0.25 seconds
+        GObject.timeout_add(250, lambda x: self.middle_pane_search_changed(),
                             None)
         self.ui.get_object('refresh_middle_pane_search').connect('clicked', lambda x: self.refresh_middle_pane_search())
         self.ui.get_object('clear_middle_pane_search').connect('clicked', lambda x: self.clear_all_search_and_filters())
@@ -710,7 +709,7 @@ class MainGUI:
          * `name` and `icon` are the visibly displayed name and icon
          * `playlist_id` is the id of the playlist in the database
          * `editable` is True only for Playlists (they can be renamed)
-         * `source` is used for saved searches and the searches themselv
+         * `source` is used for saved searches and the searches themselves
         '''
         left_pane = self.ui.get_object('left_pane')
         # name, icon, playlist_id, editable, source
@@ -996,9 +995,9 @@ class MainGUI:
         selection = self.ui.get_object('left_pane_selection')
         liststore, row = selection.get_selected()
         if liststore[row][4] == 'local':
-            # Re-select to force a refresh
-            self.select_left_pane_item(self.ui.get_object('left_pane_selection'))
+            # Re-select to force a refresh            
             self.refresh_my_library_count()
+            self.select_left_pane_item(self.ui.get_object('left_pane_selection'))
 
     def refresh_left_pane(self):
         # FIXME: These should not be loaded again and again
@@ -1106,7 +1105,7 @@ class MainGUI:
             self.ui.get_object('middle_pane_search').set_text('')
 
         if liststore[row][4] == 'local':
-            self.current_middle_top_pane_refresh_thread_ident = thread.start_new_thread(self.refresh_middle_pane_from_my_library, (True,))
+            self.refresh_middle_pane_from_my_library(True)
         else:
             def error_callback(data1, data2):
                 print 'Error callback, received data1: ', data1
@@ -2066,6 +2065,7 @@ class MainGUI:
         liststore, rows = selection.get_selected()
         liststore.set_value(self.left_pane_model.get_iter((0,)), 0,
                             '<b>My Library</b>  <span foreground="#888888">(%i)</span>' % Paper.objects.count())
+        
 
     def refresh_middle_pane_from_external(self, search_info, results):
         ''' 
