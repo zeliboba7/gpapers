@@ -60,7 +60,8 @@ from gpapers.importer import pubmed, google_scholar, jstor
 
 log_level_debug()
 
-BASE_DIR = os.path.abspath(os.path.split(__file__)[0]) + '/../'
+# our directory
+BASE_DIR = os.path.abspath(os.path.split(__file__)[0])
 PROGRAM = 'gPapers'
 DATE_FORMAT = '%Y-%m-%d'
 LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION = ('add_to_playlist',
