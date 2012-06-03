@@ -2256,7 +2256,8 @@ class AuthorEditGUI:
         self.author.rating = round(self.ui.get_object('rating').get_value())
         self.author.save()
         org_ids = set()
-        self.organizations_model.foreach(lambda model, path, iter: org_ids.add(model.get_value(iter, 0)))
+        for organization in self.organizations_model:
+            org_ids.add(organization[0]) 
         self.author.organizations = Organization.objects.in_bulk(list(org_ids))
         self.author_edit_dialog.destroy()
         if self.callback_on_save:

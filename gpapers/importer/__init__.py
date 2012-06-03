@@ -669,7 +669,7 @@ class SimpleWebSearchProvider(WebSearchProvider):
             #except Exception as ex:
             #    error_callback(ex, user_data)
         else:
-            error_callback(message.status_code)
+            error_callback(message.status_code, None)
 
     def import_paper_after_search(self, data, callback):
         try:
