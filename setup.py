@@ -46,7 +46,7 @@ setup(name='gPapers',
       author='Derek Anderson',
       author_email='public@kered.org',
       url='http://gpapers.org/',
-      packages=['gpapers', 'deseb'],
+      packages=['gpapers'],
       package_data = {'gpapers': ['data/*', 'icons/*']},
       scripts=['gpapers.py'],
       #TODO: desktop file
