@@ -2793,11 +2793,6 @@ class PaperEditGUI:
 def init_db():
     import django.core.management.commands.syncdb
     django.core.management.commands.syncdb.Command().handle_noargs(interactive=False)
-    for app in models.get_apps():
-        app_name = app.__name__.split('.')[-2]
-        if app_name == 'gPapers':
-            import deseb.schema_evolution
-            deseb.schema_evolution.evolvedb(app, interactive=False, managed_upgrade_only=True)
 
 
 def main(argv):
