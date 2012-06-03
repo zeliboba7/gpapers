@@ -131,6 +131,7 @@ class PubMedSearch(WebSearchProvider):
         else:
             parsed_response = BeautifulStoneSoup(message.response_body.data)
             paper_info = {}
+
             # Journal
             try:
                 journal = parsed_response.findAll('journal')[0]
@@ -141,16 +142,23 @@ class PubMedSearch(WebSearchProvider):
                     pass
 
                 paper_info['pages'] = parsed_response.findAll('medlinepgn')[0].text
-                log_debug('Pages: %s' % paper_info.source_pages)
+                log_debug('Pages: %s' % paper_info['pages'])
             except Exception as ex:
+                pass
+
+            # Publication date
+            try:
+                articledate = parsed_response.findAll('articledate')[0]
+                paper_info['year'] = articledate.year.text
+            except:
                 pass
 
             # Title and abstract
             try:
                 paper_info['title'] = parsed_response.findAll('articletitle')[0].text
-                log_debug('Title: %s' % paper_info.title)
+                log_debug('Title: %s' % paper_info['title'])
                 paper_info['abstract'] = parsed_response.findAll('abstracttext')[0].text
-                log_debug('Abstract: %s' % paper_info.abstract)
+                log_debug('Abstract: %s' % paper_info['abstract'])
             except Exception as ex:
                 pass
 
@@ -167,6 +175,18 @@ class PubMedSearch(WebSearchProvider):
                     paper_info['authors'] = all_authors
             except Exception as ex:
                 pass
+
+            # URL + IDs
+            try:
+                articleids = parsed_response.findAll('articleid')
+                for articleid in articleids:
+                    if articleid['idtype'] == 'doi':
+                        paper_info['doi'] = articleid.text
+                    elif articleid['idtype'] == 'pubmed':
+                        paper_info['pubmed_id'] = articleid.text
+            except:
+                pass
+            print parsed_response.prettify()
 
         callback(paper_info, None, user_data)
 
