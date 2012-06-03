@@ -543,7 +543,7 @@ class MainGUI:
                          'jstor' : jstor.JSTORSearch()}
         self.displayed_paper = None
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(BASE_DIR + 'data/ui.xml')
+        self.ui.add_from_file(os.path.join(BASE_DIR, 'data', 'ui.xml'))
         self.main_window = self.ui.get_object('main_window')
         self.main_window.connect("delete-event", lambda x, y: sys.exit(0))
         self.init_menu()
@@ -2134,7 +2134,7 @@ class AuthorEditGUI:
         else:
             self.author = Author.objects.get(id=author_id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(BASE_DIR + 'data/author_edit_gui.xml')
+        self.ui.add_from_file(os.path.join(BASE_DIR, 'data', 'author_edit_gui.xml'))
         self.author_edit_dialog = self.ui.get_object('author_edit_dialog')
         self.author_edit_dialog.connect("delete-event", lambda x, y : self.author_edit_dialog.destroy)
         self.ui.get_object('button_connect').connect("clicked", lambda x: self.show_connect_menu())
@@ -2293,7 +2293,7 @@ class OrganizationEditGUI:
     def __init__(self, id):
         self.organization = Organization.objects.get(id=id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(BASE_DIR + 'data/organization_edit_gui.xml')
+        self.ui.add_from_file(os.path.join(BASE_DIR, 'data', 'organization_edit_gui.xml'))
         self.edit_dialog = self.ui.get_object('organization_edit_dialog')
         self.edit_dialog.connect("delete-event", lambda x, y : self.edit_dialog.destroy)
         self.ui.get_object('button_connect').connect("clicked", lambda x: self.show_connect_menu())
@@ -2352,7 +2352,7 @@ class SourceEditGUI:
     def __init__(self, id):
         self.source = Source.objects.get(id=id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(BASE_DIR + 'data/source_edit_gui.xml')
+        self.ui.add_from_file(os.path.join(BASE_DIR, 'data', 'source_edit_gui.xml'))
         self.edit_dialog = self.ui.get_object('source_edit_dialog')
         self.edit_dialog.connect("delete-event", lambda x, y : self.edit_dialog.destroy)
         self.ui.get_object('button_connect').connect("clicked", lambda x: self.show_connect_menu())
@@ -2413,7 +2413,7 @@ class ReferenceEditGUI:
     def __init__(self, id):
         self.reference = Reference.objects.get(id=id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(BASE_DIR + 'data/reference_edit_gui.xml')
+        self.ui.add_from_file(os.path.join(BASE_DIR, 'data', 'reference_edit_gui.xml'))
         self.edit_dialog = self.ui.get_object('reference_edit_dialog')
         self.edit_dialog.connect("delete-event", lambda x, y : self.edit_dialog.destroy)
         self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy())
@@ -2471,7 +2471,7 @@ class CitationEditGUI:
     def __init__(self, id):
         self.reference = Reference.objects.get(id=id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(BASE_DIR + 'data/citation_edit_gui.xml')
+        self.ui.add_from_file(os.path.join(BASE_DIR, 'data', 'citation_edit_gui.xml'))
         self.edit_dialog = self.ui.get_object('citation_edit_dialog')
         self.edit_dialog.connect("delete-event", lambda x, y : self.edit_dialog.destroy)
         self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy())
@@ -2528,7 +2528,7 @@ class PaperEditGUI:
     def __init__(self, id):
         self.paper = Paper.objects.get(id=id)
         self.ui = Gtk.Builder()
-        self.ui.add_from_file(BASE_DIR + 'data/paper_edit_gui.xml')
+        self.ui.add_from_file(os.path.join(BASE_DIR, 'data', 'paper_edit_gui.xml'))
         self.edit_dialog = self.ui.get_object('paper_edit_dialog')
         self.edit_dialog.connect("delete-event", lambda x, y : self.edit_dialog.destroy)
         self.ui.get_object('button_cancel').connect("clicked", lambda x: self.edit_dialog.destroy())
