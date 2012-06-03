@@ -249,7 +249,7 @@ def paper_from_dictionary(paper_info, paper=None):
                 author_obj.save()
 
     # Simple attributes
-    attributes = ['title', 'abstract', 'doi', 'extracted_text']
+    attributes = ['title', 'abstract', 'doi', 'extracted_text', 'bibtex']
 
     for attr in attributes:
         log_debug('Checking if %s is in paper_info' % attr)
@@ -2464,7 +2464,6 @@ class ReferenceEditGUI:
         except: self.reference.referenced_paper = None
         self.reference.save()
         self.edit_dialog.destroy()
-
 
 
 class CitationEditGUI:
