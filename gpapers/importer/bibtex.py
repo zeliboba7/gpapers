@@ -171,6 +171,9 @@ def latex2unicode(s):
 
 
 def paper_info_from_bibtex(data):
+    
+    if data is None:
+        return {}
 
     # ieee puts <br>s in their bibtex
     data = data.replace('<br>', '\n')

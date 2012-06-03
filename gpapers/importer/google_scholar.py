@@ -119,7 +119,8 @@ class GoogleScholarSearch(SimpleWebSearchProvider):
 
     def _got_bibtex(self, message, callback, user_data):
         if message.status_code == Soup.KnownStatusCode.OK:
-            bibtex_data = message.request_body.data
+            bibtex_data = message.response_body.flatten().get_data()
+
             log_debug('Received BibTeX data:\n%s' % bibtex_data)
             paper_info = paper_info_from_bibtex(bibtex_data)
         else:
