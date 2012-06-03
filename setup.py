@@ -46,8 +46,18 @@ setup(name='gPapers',
       author='Derek Anderson',
       author_email='public@kered.org',
       url='http://gpapers.org/',
-      packages=['gpapers'],
-      package_data = {'gpapers': ['data/*', 'icons/*']},
+      packages=['gpapers', 'gpapers.gPapers', 'gpapers.importer'],
+      package_data={'gpapers': ['data/*', 'icons/*']},
       scripts=['gpapers.py'],
+       classifiers=[
+          'Development Status :: 3 - Alpha',
+          'Environment :: X11 Applications :: GTK',
+          'Intended Audience :: End Users/Desktop',
+          'Intended Audience :: Science/Research',
+          'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+          'Operating System :: POSIX :: Linux',
+          'Programming Language :: Python',
+          'Topic :: Utilities'
+          ],
       #TODO: desktop file
      )
