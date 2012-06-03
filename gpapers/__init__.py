@@ -50,8 +50,6 @@ from django.template import defaultfilters
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
-import deseb
-
 from gpapers.logger import *
 from gpapers.importer import bibtex, pdf_file
 import gpapers.desktop
@@ -654,7 +652,7 @@ class MainGUI:
         playlist, created = Playlist.objects.get_or_create(
             title='search: <i>%s</i>' % self.ui.get_object('middle_pane_search').get_text(),
             search_text=self.ui.get_object('middle_pane_search').get_text(),
-            parent=self.search_providers[liststore[row][4]]
+            parent=self.search_providers[liststore[row][4]].label
         )
         if created: playlist.save()
         self.refresh_left_pane()
@@ -662,7 +660,7 @@ class MainGUI:
     def create_playlist(self, ids=None):
         playlist = Playlist.objects.create(
             title='<i>(new collection)</i>',
-            parent='0'
+            parent='local'
         )
         if ids:
             for paper in Paper.objects.in_bulk(ids).values():
@@ -854,7 +852,6 @@ class MainGUI:
         author_filter.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
         column = Gtk.TreeViewColumn("Author", Gtk.CellRendererText(), text=1)
         column.set_sort_column_id(1)
-        column.set_min_width(128)
         column.set_expand(True)
         author_filter.append_column(column)
         column = Gtk.TreeViewColumn("Papers", Gtk.CellRendererText(), text=2)
@@ -872,7 +869,6 @@ class MainGUI:
         organization_filter.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
         column = Gtk.TreeViewColumn("Organization", Gtk.CellRendererText(), text=1)
         column.set_sort_column_id(1)
-        column.set_min_width(128)
         column.set_expand(True)
         organization_filter.append_column(column)
         column = Gtk.TreeViewColumn("Authors", Gtk.CellRendererText(), text=2)
@@ -893,7 +889,6 @@ class MainGUI:
         source_filter.set_model(self.source_filter_model)
         column = Gtk.TreeViewColumn("Source", Gtk.CellRendererText(), text=1)
         column.set_sort_column_id(1)
-        column.set_min_width(128)
         column.set_expand(True)
         source_filter.append_column(column)
         column = Gtk.TreeViewColumn("Issue", Gtk.CellRendererText(), text=2)
@@ -1046,6 +1041,7 @@ class MainGUI:
             self.left_pane_model.append(None, (provider.name,
                              provider_icon, -1, False, provider.label))
             for playlist in Playlist.objects.filter(parent=provider.label):
+                print 'paylist item', playlist
                 icon = left_pane.render_icon(Gtk.STOCK_FIND, Gtk.IconSize.MENU)
                 self.left_pane_model.append(self.left_pane_model.get_iter((1),),
                                             (playlist.title, icon, playlist.id,
@@ -1128,7 +1124,7 @@ class MainGUI:
 
         column = Gtk.TreeViewColumn()
         column.set_title('Title')
-        column.set_min_width(-1)
+        column.set_expand(True)
         renderer = Gtk.CellRendererPixbuf()
         column.set_cell_data_func(renderer, render_paper_document_attribute,
                                   middle_top_pane)
@@ -1140,13 +1136,14 @@ class MainGUI:
                   
         middle_top_pane.append_column(column)
         for attribute in ['Authors', 'Journal', 'Year', 'Created']:
-            column = Gtk.TreeViewColumn(attribute)
-            column.set_min_width(-1)
+            column = Gtk.TreeViewColumn(attribute)            
             renderer = Gtk.CellRendererText()
             column.pack_start(renderer, True)
             column.set_cell_data_func(renderer, render_paper_text_attribute,
                                       attribute)
-            column.set_expand(True)
+            if attribute == 'Authors':
+                # only authors and title column should expand
+                column.set_expand(True)
             middle_top_pane.append_column(column)
 
         make_all_columns_resizeable_clickable_ellipsize(middle_top_pane.get_columns())
@@ -1516,6 +1513,7 @@ class MainGUI:
         if not rows or len(rows) == 0:
             self.update_bookmark_pane_from_paper(None)
         elif len(rows) == 1:
+            # a single selected paper
             self.displayed_paper = paper = liststore[rows[0]][0]
             if paper.title:
                 self.paper_information_pane_model.append(('<b>Title:</b>',
@@ -1654,6 +1652,7 @@ class MainGUI:
                     paper_information_toolbar.insert(button, -1)
 
         else:
+            # more than one paper
             self.update_bookmark_pane_from_paper(None)
             self.paper_information_pane_model.append(('<b>Number of papers:</b>', str(len(rows)) ,))
 
@@ -1663,7 +1662,7 @@ class MainGUI:
                 if paper.import_url and paper.id == -1:
                     downloadable_paper_urls.add(paper.import_url)
             if len(downloadable_paper_urls):
-                self.paper_information_pane_model.append(('<b>Number of new papers:</b>', len(downloadable_paper_urls) ,))
+                self.paper_information_pane_model.append(('<b>Number of new papers:</b>', str(len(downloadable_paper_urls)) ,))
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_ADD)
                 button.set_tooltip_text('Add new papers (%i) to your library...' % len(downloadable_paper_urls))
                 button.connect('clicked', lambda x: fetch_citations_via_urls(downloadable_paper_urls))
@@ -2232,7 +2231,9 @@ class AuthorEditGUI:
     def get_new_organizations_menu(self):
         button_submenu = Gtk.Menu()
         org_ids = set()
-        self.organizations_model.foreach(lambda model, path, iter: org_ids.add(model.get_value(iter, 0)))
+        for organization in self.organizations_model:
+            org_ids.add(organization[0])
+
         for organization in Organization.objects.order_by('name'):
             if organization.id not in org_ids and len(organization.name):
                 submenu_item = Gtk.MenuItem(truncate_long_str(organization.name))

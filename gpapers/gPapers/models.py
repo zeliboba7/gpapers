@@ -234,17 +234,9 @@ class Bookmark(models.Model):
 
 class Playlist(models.Model):
 
-    SOURCES = (
-        ('0', 'My Library'),
-        ('1', 'ACM'),
-        ('2', 'IEEE'),
-        ('3', 'PubMed'),
-        ('4', 'CiteSeer'),
-        ('5', 'Google Scholar'),
-    )
     title = models.CharField(max_length='1024', blank=True)
     search_text = models.CharField(max_length='1024', blank=True)
-    parent = models.CharField(max_length=1, choices=SOURCES)
+    parent = models.CharField(max_length=128)
     papers = models.ManyToManyField(Paper)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
