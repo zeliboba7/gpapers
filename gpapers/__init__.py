@@ -990,9 +990,11 @@ class MainGUI:
         log_debug('handle_libray_updates called')
         selection = self.ui.get_object('left_pane_selection')
         liststore, row = selection.get_selected()
+        self.refresh_my_library_count()
+        
         if liststore[row][4] == 'local':
-            # Re-select to force a refresh            
-            self.refresh_my_library_count()
+            log_debug('handle_libray_updates on local library')
+            # Re-select to force a refresh                        
             self.select_left_pane_item(self.ui.get_object('left_pane_selection'))
 
     def refresh_left_pane(self):
