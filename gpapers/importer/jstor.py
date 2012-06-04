@@ -103,7 +103,3 @@ class JSTORSearch(SimpleWebSearchProvider):
 
         return papers
 
-    def fill_in_paper_info(self, data):
-        paper_info = self._parse_result(data)
-
-        return paper_info

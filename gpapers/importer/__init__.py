@@ -244,9 +244,6 @@ def import_citation(url, paper=None, callback=None):
     if active_threads.has_key(str(thread.get_ident())):
         del active_threads[str(thread.get_ident())]
 
-p_html_a = re.compile("<a [^>]+>" , re.IGNORECASE)
-p_html_a_href = re.compile('''href *= *['"]([^'^"]+)['"]''' , re.IGNORECASE)
-
 
 def _import_unknown_citation(data, orig_url, paper=None):
 
@@ -536,11 +533,11 @@ class WebSearchProvider(object):
                currently) used in the left column of the GUI, e.g.
                "favicon_google.ico". If no icon name is provided, a standard
                icon is used.
-    * `unique_keys`: Defining under what circumstances a search result should be
-                     considered a duplicate of an existing paper in the
-                     database. For a PubMED search, for example, this should be
-                     'pubmed_id'. If the unique key is not set, 'doi' is used
-                     as a default.
+    * `unique_key`: Defining under what circumstances a search result should be
+                    onsidered a duplicate of an existing paper in the
+                    database. For a PubMED search, for example, this should be
+                    'pubmed_id'. If the unique key is not set, 'doi' is used
+                    as a default.
 
 
     A search provider has to provide the following methods:
@@ -559,14 +556,14 @@ class WebSearchProvider(object):
     This method should not block but use the :class:`AsyncSoupSession` object
     `importer.soup_session` for getting the information. 
 
-    * `import_paper_after_search(self, data, paper, callback, error_callback)`
+    * `import_paper_after_search(self, data, paper, callback)`
     This method receives the `data` (if any) previously returned from the
-    :method:`parse_website_response` method and a :class:`Paper` object, already
+    :method:`search_async` method and a :class:`Paper` object, already
     filled with the information previously returned from the search. It should
     call the callback when it is finished processing (which may include getting
     more information from webpages -- in this case the :class:`AsyncSoupSession`
     object `importer.soup_session` should be used to asynchronously fetch the 
-    page(s). The callback function has to be called with the same :class:`Paper`
+    page(s)). The callback function has to be called with the same :class:`Paper`
     object (with any additional information now available filled in, generated
     :class:`Author` objects, etc.) as the first argument. Optionally, a list of
     URL strings can be given as the second argument, these URLs will be used 
@@ -637,11 +634,18 @@ class SimpleWebSearchProvider(WebSearchProvider):
     a search and do not have to perform additional web requests to get more 
     detailed info for a paper chosen for import.
 
-    Such web search providers need only provide three functions:
-    * prepare_search_message 
-    * parse_response
-    * fill_in_paper_info
-    
+    Such web search providers need only to provide two simple functions 
+    (see :class:`importer.jstor.JSTORSearch` for an example):
+    * prepare_search_message(self, search_string)
+          Has to construct and return a `Soup.Message` object using
+          `Soup.Message.new`, for example:
+          ..                     
+              return Soup.Message.new(method='GET',
+                                      uri_string='http://example.com/search?query=search_string')  
+
+    * parse_response(self, response):
+      Receives the HTML response of the website and should return a paper info
+      dictionary (see :class:`WebSearchProvider`).
     '''
 
     def __init__(self):
@@ -665,17 +669,15 @@ class SimpleWebSearchProvider(WebSearchProvider):
         '''
         if message.status_code == Soup.KnownStatusCode.OK:
             #try:
-                callback(self.parse_response(message.response_body.data))
+                callback(self.parse_response(message.response_body.flatten().get_data()))
             #except Exception as ex:
             #    error_callback(ex, user_data)
         else:
             error_callback(message.status_code, None)
 
-    def import_paper_after_search(self, data, callback):
-        try:
-            callback(self.fill_in_paper_info(data), None, self.label)
-        except Exception as ex:
-            log_error(str(ex))
+    def import_paper_after_search(self, data, paper, callback):
+        # Nothing to add
+        callback(paper, [], self.label)
 
     # -------------------------------------------------------------------------
     # Methods to overwrite in sub classes
@@ -684,7 +686,4 @@ class SimpleWebSearchProvider(WebSearchProvider):
         raise NotImplementedError()
 
     def parse_response(self, response):
-        raise NotImplementedError()
-
-    def fill_in_paper_info(self, data):
         raise NotImplementedError()
