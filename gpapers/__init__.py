@@ -1106,12 +1106,22 @@ class MainGUI:
         if liststore[row][4] == 'local':
             self.refresh_middle_pane_from_my_library(True)
         else:
+            search_provider = self.search_providers[liststore[row][4]]
+            search_text = self.ui.get_object('middle_pane_search').get_text()
+            status_text = 'Searching "%s" (%s)' % (search_text, search_provider)
+            # used to identify the search so that the status can be updated 
+            # when the search results arrive
+            search_status_key = str((search_provider.label, search_text))
+            self.active_threads[search_status_key] = status_text
+                     
             def error_callback(data1, data2):
-                print 'Error callback, received data1: ', data1
-                print 'Error callback, received data2: ', data2
+                # TODO: Do something useful here, display error dialog
+                log_warning('Error callback, received data1: %s' % data1)
+                log_warning('Error callback, received data2: %s' % data2)
 
-            self.search_providers[liststore[row][4]].search(self.ui.get_object('middle_pane_search').get_text(),
-                                                            self.refresh_middle_pane_from_external, error_callback)
+            search_provider.search(search_text,
+                                   self.refresh_middle_pane_from_external,
+                                   error_callback)
 
         self.select_middle_top_pane_item(self.ui.get_object('middle_top_pane').get_selection())
 
@@ -2085,7 +2095,11 @@ class MainGUI:
         results of a later search.
         '''
 
-        label, search_string = search_info
+        if str(search_info) in self.active_threads:
+            del self.active_threads[str(search_info)]
+
+        label, search_string = search_info   
+        
         search_provider = self.search_providers[label]
         log_info('Received results for %s: %s' % (search_provider.name,
                                                   search_string))
