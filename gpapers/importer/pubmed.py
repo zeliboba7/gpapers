@@ -186,7 +186,6 @@ class PubMedSearch(WebSearchProvider):
                         paper_info['pubmed_id'] = articleid.text
             except:
                 pass
-            print parsed_response.prettify()
 
         callback(paper_info, None, user_data)
 
