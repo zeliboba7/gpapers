@@ -48,6 +48,7 @@ setup(name='gPapers',
       url='http://gpapers.org/',
       packages=['gpapers', 'gpapers.gPapers', 'gpapers.importer'],
       package_data={'gpapers': ['data/*', 'icons/*']},
+      data_files=[('share/applications', ['xdg/gpapers.desktop'])],
       scripts=['gpapers.py'],
        classifiers=[
           'Development Status :: 3 - Alpha',
@@ -59,5 +60,4 @@ setup(name='gPapers',
           'Programming Language :: Python',
           'Topic :: Utilities'
           ],
-      #TODO: desktop file
      )
