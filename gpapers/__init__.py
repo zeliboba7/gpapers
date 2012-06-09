@@ -2821,10 +2821,8 @@ def main(argv):
 
     log_info('using database at %s' % MEDIA_ROOT)
 
-    if not os.path.isdir(MEDIA_ROOT):
-        os.mkdir(MEDIA_ROOT)
     if not os.path.isdir(os.path.join(MEDIA_ROOT, 'papers')):
-        os.mkdir(os.path.join(MEDIA_ROOT, 'papers'))
+        os.makedirs(os.path.join(MEDIA_ROOT, 'papers'))
     global main_gui
     init_db()
     main_gui = MainGUI()
