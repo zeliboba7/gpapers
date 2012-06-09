@@ -261,33 +261,72 @@ def paper_from_dictionary(paper_info, paper=None):
 
     return paper
 
+def compare_papers(column, row1, row2, user_data):
+    '''
+    This function is used to compare two rows for the sorting in the table.
+    As our model does not have any columns, the sort column ids are ignored.
+    The argument `user_data` is used for specifying on which attribute
+    the sorting is to be done.
+    '''  
+    paper1 = column.get_value(row1, 0)
+    paper2 = column.get_value(row2, 0)
+    
+    if user_data == 'rating':
+        value1 = paper1.rating
+        value2 = paper2.rating
+    else:
+        value1 = get_paper_text_attribute(paper1, user_data)
+        value2 = get_paper_text_attribute(paper2, user_data)
 
-def render_paper_text_attribute(column, cell, model, iter, attribute):
+    if value1 < value2:
+        return -1
+    elif value1 == value2:
+        return 0
+    else:
+        return 1
+
+
+def get_paper_text_attribute(paper, attribute):
     '''
-    This function is used by the view of the list of papers to extract an 
-    attribute from the paper object.
+    Returns a string representation of an `attribute` of a certain `paper`. 
+    Used by the TreeView and for sorting.
+    
+    Note that `attribute` does not always correspond to a direct attribute of 
+    the `Paper` class, it can also be `'Year'` (the year of the publication date
+    of the source), `'Journal'` (the name of the source) or `'Authors'` (a
+    combined string of all authors names).
     '''
-    paper = model.get_value(iter, 0)
     
     # special case some attributes that are not direct attributes of the paper object
     if attribute == 'Authors':
-        authors = ', '.join([ author.name for author in paper.get_authors_in_order() ])
-        cell.set_property('text', authors)
+        authors = ', '.join([ author.name for author in
+                             paper.get_authors_in_order()])
+        return authors
     elif attribute == 'Journal':
         if paper.source:
             journal = paper.source.name
         else:
             journal = ''
-        cell.set_property('text', journal)
+        return journal
     elif attribute == 'Year':
         if paper.source and paper.source.publication_date:
             pub_year = str(paper.source.publication_date.year)
         else:
             pub_year = ''
-        cell.set_property('text', pub_year)
+        return pub_year
     else:
-        # Set the text to the value of the respective attribute
-        cell.set_property('text', str(getattr(paper, attribute.lower())))
+        # Get the value of the respective attribute
+        return str(getattr(paper, attribute.lower()))
+
+
+def render_paper_text_attribute(column, cell, model, iter, attribute):
+    '''
+    This function is used by the view of the list of papers to display an 
+    attribute for the paper object.
+    '''
+    paper = model.get_value(iter, 0)
+    attribute_text = get_paper_text_attribute(paper, attribute)
+    cell.set_property('text', attribute_text)
 
 
 def render_paper_rating_attribute(column, cell, model, iter, data):
@@ -1146,14 +1185,24 @@ class MainGUI:
         column.pack_start(renderer, True)
         column.set_cell_data_func(renderer, render_paper_text_attribute, 
                                   'Title')
-                  
-        middle_top_pane.append_column(column)
-        for attribute in ['Authors', 'Journal', 'Year', 'Created']:
+        column.set_sort_column_id(0)
+        self.middle_top_pane_model.set_sort_func(0, compare_papers, 'Title')
+                          
+        middle_top_pane.append_column(column)        
+        for c_idx, attribute in enumerate(['Authors', 'Journal', 'Year',
+                                           'Created']):
             column = Gtk.TreeViewColumn(attribute)            
             renderer = Gtk.CellRendererText()
             column.pack_start(renderer, True)
             column.set_cell_data_func(renderer, render_paper_text_attribute,
                                       attribute)
+            # We fake some column indices here that do actually not correspond
+            # to column indices in the model (the model has only one column
+            # containing the paper object). We use a custom sort function to
+            # make the sorting work
+            column.set_sort_column_id(c_idx + 1)
+            self.middle_top_pane_model.set_sort_func(c_idx + 1, compare_papers,
+                                                     attribute)
             if attribute == 'Authors':
                 # only authors and title column should expand
                 column.set_expand(True)
