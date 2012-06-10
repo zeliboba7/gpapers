@@ -70,6 +70,8 @@ MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION = ('reorder_playlist',
                                                Gtk.TargetFlags.SAME_WIDGET, 1)
 PDF_PREVIEW_MOVE_NOTE_DND_ACTION = ('move_note', Gtk.TargetFlags.SAME_WIDGET,
                                     2)
+MIDDLE_TOP_PANE_EXTERNAL_DND_ACTION = ('drop_external',
+                                       Gtk.TargetFlags.OTHER_APP, 3)
 NOTE_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons',
                                                         'note.png'))
 BOOKMARK_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons',
@@ -370,10 +372,10 @@ class MainGUI:
             paper_info = bibtex.paper_info_from_bibtex(bibtex_data)
             paper_from_dictionary(paper_info, paper=paper)
 
-        except django.MultipleObjectsReturned:
-            log_warning('More than one paper in the database has DOI %s -- aborting.' % doi)
+        except MultipleObjectsReturned:
+            log_warn('More than one paper in the database has DOI %s -- aborting.' % doi)
         except Paper.DoesNotExist:
-            log_warning('No paper in the database has DOI %s -- aborting.' % doi)
+            log_warn('No paper in the database has DOI %s -- aborting.' % doi)
 
     def document_imported(self, paper_info, paper_data, user_data):
         '''
@@ -1167,7 +1169,6 @@ class MainGUI:
     def init_middle_top_pane(self):
         middle_top_pane = self.ui.get_object('middle_top_pane')
         # We directly save Paper objects in the model
-        # TODO: Column sorting no longer works...
         self.middle_top_pane_model = Gtk.ListStore(object)
         middle_top_pane.set_model(self.middle_top_pane_model)
         middle_top_pane.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
@@ -1212,10 +1213,17 @@ class MainGUI:
 
         middle_top_pane.connect('row-activated', self.handle_middle_top_pane_row_activated)
         middle_top_pane.get_selection().connect('changed', self.select_middle_top_pane_item)
-
-        middle_top_pane.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, [LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION, MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION], Gdk.DragAction.COPY | Gdk.DragAction.MOVE)
+        middle_top_pane.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK,
+                                                 [LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION,
+                                                  MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION],
+                                                 Gdk.DragAction.COPY | Gdk.DragAction.MOVE)
         middle_top_pane.connect('drag-data-get', self.handle_middle_top_pane_drag_data_get)
-        middle_top_pane.enable_model_drag_dest([MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION], Gdk.DragAction.MOVE)
+        middle_top_pane.enable_model_drag_dest([MIDDLE_TOP_PANE_REORDER_PLAYLIST_DND_ACTION],
+                                               Gdk.DragAction.MOVE)
+        middle_top_pane.enable_model_drag_dest([MIDDLE_TOP_PANE_EXTERNAL_DND_ACTION],
+                                               Gdk.DragAction.COPY)
+        middle_top_pane.drag_dest_add_text_targets()
+        middle_top_pane.drag_source_add_text_targets()        
         middle_top_pane.connect('drag-data-received', self.handle_middle_top_pane_drag_data_received_event)
 
     def handle_middle_top_pane_row_activated(self, treeview, path, view_column):
@@ -1227,9 +1235,12 @@ class MainGUI:
             traceback.print_exc()
 
     def handle_middle_top_pane_drag_data_get(self, treeview, context, selection, info, timestamp):
-        liststore, row = treeview.get_selection().get_selected()
-        id = liststore[row][0]
-        selection.set('text/plain', len(str(id)), str(id))
+        liststore, rows = treeview.get_selection().get_selected_rows()
+        if len(rows) > 1:
+            log_warn('drag and drop for multiple rows not implemented yet')
+        else:
+            id = liststore[rows[0]][0].id
+            selection.set_text(str(id), -1)
 
     def handle_author_filter_row_activated(self, treeview, path, view_column):
         liststore, rows = treeview.get_selection().get_selected()
@@ -1501,38 +1512,87 @@ class MainGUI:
         except:
             traceback.print_exc()
 
-    def handle_middle_top_pane_drag_data_received_event(self, treeview, context, x, y, selection, info, timestamp):
+    def handle_middle_top_pane_drag_data_received_event(self, treeview,
+                                                        context, x, y, selection,
+                                                        info, timestamp):
+        '''
+        We handle two kinds of drop events:
+        * Internal move: Moving rows around in document collections (TODO:
+          Should not occur outside of collections)
+        * Dropping of external URLs (e.g. from file manager or browser), 
+          triggering an import
+        '''        
         try:
-            drop_info = treeview.get_dest_row_at_pos(x, y)
-            if drop_info and self.current_playlist:
-                model = treeview.get_model()
-                path, position = drop_info
-                data = selection.data
-                playlist = self.current_playlist
-                paper_list = list(playlist.papers.all())
-                l = []
-                for i in range(0, len(paper_list)):
-                    paper = paper_list[i]
-                    if str(paper.id) == str(data):
-                        break
-                if path[0] == i:
-                    return
-                if path[0] == i + 1 and (position == Gtk.TreeViewDropPosition.AFTER or position == Gtk.TreeViewDropPosition.INTO_OR_AFTER):
-                    return
-                if path[0] == i - 1 and (position == Gtk.TreeViewDropPosition.BEFORE or position == Gtk.TreeViewDropPosition.INTO_OR_BEFORE):
-                    return
-                paper_list[i] = None
-                if position == Gtk.TreeViewDropPosition.BEFORE or position == Gtk.TreeViewDropPosition.INTO_OR_BEFORE:
-                    paper_list.insert(path[0], paper)
-                if position == Gtk.TreeViewDropPosition.AFTER or position == Gtk.TreeViewDropPosition.INTO_OR_AFTER:
-                    paper_list.insert(path[0] + 1, paper)
-                paper_list.remove(None)
-                playlist.papers.clear()
-                for paper in paper_list:
-                    playlist.papers.add(paper)
-                thread.start_new_thread(self.refresh_middle_pane_from_my_library, (False,))
-            if not self.current_playlist:
-                log_info('can only reorder playlists')
+            data = selection.get_data()
+            if data.startswith('file://'):
+                filename = data[7:].strip() # remove trailing newline
+                content_type = importer.determine_content_type(filename)
+                if content_type == 'application/pdf':
+                    
+                    def mycallback(file_object, asyncresult, user_data):
+                        # Get the actual file content 
+                        file_content = file_object.load_contents_finish(asyncresult)[1]
+        
+                        self.document_imported(paper_data=file_content, paper_info=None,
+                                               user_data=user_data)
+    
+                    import_documents_via_filenames([filename], mycallback)
+                elif content_type == 'text/x-bibtex':
+                    
+                    def mycallback(file_object, asyncresult, user_data):
+                        # Get the actual file content 
+                        file_content = file_object.load_contents_finish(asyncresult)[1]
+                        paper_info = bibtex.paper_info_from_bibtex(file_content)
+                        url = paper_info.get('import_url')
+                        if not url:
+                            url = paper_info.get('doi')
+                            if url:
+                                url = 'http://dx.doi.org/' + url            
+                        if url:
+                            importer.import_from_url(url, self.document_imported,
+                                                     paper_info=paper_info)
+                        else:
+                            self.document_imported(paper_info, paper_data=None,
+                                                   user_data=None)
+                    gfile = Gio.File.new_for_uri(data.strip())
+                    # first argument is the `cancellable` object
+                    gfile.load_contents_async(None, mycallback, data.strip())                                    
+            elif data.startswith('http://') or data.startswith('https://'):
+                importer.active_threads[url] = 'Importing URL'
+                importer.import_from_url(data, self.document_imported)
+            else: # assume a paper id, i.e. rearranging papers in a collection
+                drop_info = treeview.get_dest_row_at_pos(x, y)
+                if self.current_playlist and drop_info:
+                    model = treeview.get_model()
+                    path, position = drop_info
+                    path_idx = path.get_indices()[0]
+                    playlist = self.current_playlist
+                    paper_list = list(playlist.papers.all())
+                    l = []
+                    for i in range(0, len(paper_list)):
+                        paper = paper_list[i]
+                        if str(paper.id) == str(data):
+                            break
+                    if path_idx == i:
+                        return
+                    if path_idx == i + 1 and (position == Gtk.TreeViewDropPosition.AFTER or
+                                              position == Gtk.TreeViewDropPosition.INTO_OR_AFTER):
+                        return
+                    if path_idx == i - 1 and (position == Gtk.TreeViewDropPosition.BEFORE or
+                                             position == Gtk.TreeViewDropPosition.INTO_OR_BEFORE):
+                        return
+                    paper_list[i] = None
+                    if position == Gtk.TreeViewDropPosition.BEFORE or position == Gtk.TreeViewDropPosition.INTO_OR_BEFORE:
+                        paper_list.insert(path_idx, paper)
+                    if position == Gtk.TreeViewDropPosition.AFTER or position == Gtk.TreeViewDropPosition.INTO_OR_AFTER:
+                        paper_list.insert(path_idx + 1, paper)
+                    paper_list.remove(None)
+                    playlist.papers.clear()
+                    for paper in paper_list:
+                        playlist.papers.add(paper)
+                    self.refresh_middle_pane_from_my_library(False)
+                if not self.current_playlist:
+                    log_info('can only reorder playlists')
         except:
             traceback.print_exc()
 
