@@ -1157,8 +1157,10 @@ class MainGUI:
                      
             def error_callback(data1, data2):
                 # TODO: Do something useful here, display error dialog
-                log_warning('Error callback, received data1: %s' % data1)
-                log_warning('Error callback, received data2: %s' % data2)
+                log_warn('Error callback, received data1: %s' % data1)
+                log_warn('Error callback, received data2: %s' % data2)
+                if search_status_key in self.active_threads:
+                    del self.active_threads[search_status_key]
 
             search_provider.search(search_text,
                                    self.refresh_middle_pane_from_external,
