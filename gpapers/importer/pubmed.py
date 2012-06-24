@@ -69,7 +69,7 @@ class PubMedSearch(WebSearchProvider):
 
     def _summaries_received(self, message, callback, error_callback):
         if not message.status_code == Soup.KnownStatusCode.OK:
-            error_callback('Pubmed replied with error code %d.' % message.status_code, user_data)
+            error_callback('Pubmed replied with error code %d.' % message.status_code)
         else:
             response_data = message.response_body.flatten().get_data()
             parsed_response = BeautifulSoup.BeautifulStoneSoup(response_data)

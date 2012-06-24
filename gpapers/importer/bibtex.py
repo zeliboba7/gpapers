@@ -33,9 +33,7 @@
 #  Matthew Brett 2010
 #  Simplified BSD license
 
-import re
 from gpapers.logger import log_info, log_debug
-import pprint
 
 from pyparsing import (Regex, Suppress, ZeroOrMore, Group, Optional, Forward,
                        SkipTo, CaselessLiteral, Dict)
