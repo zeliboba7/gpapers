@@ -100,11 +100,11 @@ def humanize_count(x, s, p, places=1):
 
 
 def truncate_long_str(s, max_length=96):
-    s = str(s)
+    s = unicode(s)
     if len(s) < max_length:
         return s
     else:
-        return s[0:max_length] + '...'
+        return s[0:max_length] + u'…'
 
 
 def set_model_from_list(cb, items):
@@ -365,6 +365,7 @@ class MainGUI:
         Callback function that is called when new bibtex data for a paper
         arrives. Writes the information to the paper object and saves it.
         '''
+        log_debug('Received bibtex data for doi %s: %s' % (doi, bibtex_data))
         try:
             # Get the paper for the DOI -- should be only one!
             paper = Paper.objects.get(doi=doi)
@@ -383,17 +384,21 @@ class MainGUI:
         dictionary with document metadata, `paper_data` is the PDF itself.
         '''
 
-        if user_data in importer.active_threads:
-            del importer.active_threads[str(user_data)]
+        if user_data in self.active_threads:
+            del self.active_threads[str(user_data)]
 
         if paper_data is None and paper_info is None:
             # FIXME: This should be handled via an error callback
             return
 
         if paper_data is not None:
+            
             # Get some info from the PDF:
+            self.active_threads[str(user_data)] = 'Extracting data from PDF'
             paper_info_pdf = pdf_file.get_paper_info_from_pdf(paper_data)
-
+            del self.active_threads[str(user_data)]
+            
+            log_debug('in document_imported: paper_info is %s' % paper_info)
             # Add everything that is not already known
             if paper_info is None:
                 paper_info = paper_info_pdf
@@ -611,6 +616,7 @@ class MainGUI:
         post_save.connect(receiver_wrapper, sender=Paper, weak=False)
         post_delete.connect(receiver_wrapper, sender=Paper, weak=False)
 
+        self.main_window.maximize()
         self.main_window.show()
 
     def init_busy_notifier(self):
