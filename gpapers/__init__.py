@@ -145,8 +145,15 @@ def fetch_citations_via_references(references):
 
 def import_citations(urls):
     for url in urls:
-        importer.import_citation(url, callback=main_gui.refresh_middle_pane_search)
-    main_gui.refresh_middle_pane_search()
+        
+        # display status message and delete it afterwards
+        main_gui.active_threads[url] = 'Importing %s' % url
+        def my_callback():
+            if url in main_gui.active_threads:
+                del main_gui.active_threads[url]
+            main_gui.refresh_middle_pane_search()
+            
+        importer.import_citation(url, callback=my_callback)
 
 
 def import_citations_via_references(references):
@@ -311,7 +318,7 @@ def get_paper_text_attribute(paper, attribute):
         return pub_year
     else:
         # Get the value of the respective attribute
-        return str(getattr(paper, attribute.lower()))
+        return unicode(getattr(paper, attribute.lower()))
 
 
 def render_paper_text_attribute(column, cell, model, iter, attribute):
@@ -440,7 +447,7 @@ class MainGUI:
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             url = entry.get_text()
-            importer.active_threads[url] = 'Importing URL'
+            importer.active_threads[url] = 'Importing %s' % url
             importer.import_from_url(url, self.document_imported)
 
         dialog.destroy()
