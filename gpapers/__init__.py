@@ -20,20 +20,16 @@
 #    You should have received a copy of the GNU General Public License
 #    along with gPapers.  If not, see <http://www.gnu.org/licenses/>.
 
-import commands
 from datetime import datetime, timedelta, date
 import math
 import mimetypes
 import os
 import sys
 import thread
-import threading
-import time
 import traceback
 
 from gi.repository import Gio
 from gi.repository import GObject
-from gi.repository import GLib
 from gi.repository import Gdk
 from gi.repository import Gtk
 from gi.repository import GdkPixbuf
@@ -48,14 +44,13 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.db.models import Q
 from django.template import defaultfilters
 from django.db.models.signals import post_save, post_delete
-from django.dispatch import receiver
 
-from gpapers.logger import *
+from gpapers.logger import log_level_debug, log_warn, log_info, log_debug
 from gpapers.importer import bibtex, pdf_file
 import gpapers.desktop
 from gpapers.gPapers.models import *
 import gpapers.importer as importer
-from gpapers.importer import pango_escape, get_md5_hexdigest_from_data
+from gpapers.importer import pango_escape
 from gpapers.importer import pubmed, google_scholar, jstor
 
 log_level_debug()
@@ -142,13 +137,11 @@ def make_all_columns_resizeable_clickable_ellipsize(columns):
 
 def fetch_citations_via_urls(urls):
     log_info('trying to fetch: %s' % str(urls))
-    t = thread.start_new_thread(import_citations, (urls,))
-
+    thread.start_new_thread(import_citations, (urls,))
 
 def fetch_citations_via_references(references):
     log_info('trying to fetch: %s' % str(references))
-    t = thread.start_new_thread(import_citations_via_references, (references,))
-
+    thread.start_new_thread(import_citations_via_references, (references,))
 
 def import_citations(urls):
     for url in urls:
@@ -1263,7 +1256,6 @@ class MainGUI:
         if event.button == 3:
             x = int(event.x)
             y = int(event.y)
-            time = event.time
             pthinfo = treeview.get_path_at_pos(x, y)
             if pthinfo is not None:
                 path, col, cellx, celly = pthinfo
@@ -1285,7 +1277,6 @@ class MainGUI:
         y = int(event.y)
         x_percent = 1.0 * x / pdf_preview.get_allocated_width()
         y_percent = 1.0 * y / pdf_preview.get_allocated_height()
-        time = event.time
         #print 'x, y, x_percent, y_percent, time', x, y, x_percent, y_percent, time
 
         # are we clicking on a bookmark?
@@ -1370,7 +1361,6 @@ class MainGUI:
         if event.button == 3:
             x = int(event.x)
             y = int(event.y)
-            time = event.time
             pthinfo = treeview.get_path_at_pos(x, y)
             if pthinfo is not None:
                 path, col, cellx, celly = pthinfo
@@ -1397,7 +1387,6 @@ class MainGUI:
         if event.button == 3:
             x = int(event.x)
             y = int(event.y)
-            time = event.time
             pthinfo = treeview.get_path_at_pos(x, y)
             if pthinfo is not None:
                 path, col, cellx, celly = pthinfo
@@ -1435,7 +1424,6 @@ class MainGUI:
         if event.button == 3:
             x = int(event.x)
             y = int(event.y)
-            time = event.time
             pthinfo = treeview.get_path_at_pos(x, y)
             if pthinfo is not None:
                 path, col, cellx, celly = pthinfo
@@ -1459,7 +1447,6 @@ class MainGUI:
         if event.button == 3:
             x = int(event.x)
             y = int(event.y)
-            time = event.time
             pthinfo = treeview.get_path_at_pos(x, y)
             if pthinfo is not None:
                 path, col, cellx, celly = pthinfo
@@ -1480,7 +1467,6 @@ class MainGUI:
         if event.button == 3:
             x = int(event.x)
             y = int(event.y)
-            time = event.time
             pthinfo = treeview.get_path_at_pos(x, y)
             if pthinfo is not None:
                 path, col, cellx, celly = pthinfo
@@ -1565,12 +1551,10 @@ class MainGUI:
             else: # assume a paper id, i.e. rearranging papers in a collection
                 drop_info = treeview.get_dest_row_at_pos(x, y)
                 if self.current_playlist and drop_info:
-                    model = treeview.get_model()
                     path, position = drop_info
                     path_idx = path.get_indices()[0]
                     playlist = self.current_playlist
                     paper_list = list(playlist.papers.all())
-                    l = []
                     for i in range(0, len(paper_list)):
                         paper = paper_list[i]
                         if str(paper.id) == str(data):
@@ -1602,7 +1586,6 @@ class MainGUI:
         try:
             target_path, drop_position = treeview.get_dest_row_at_pos(x, y)
             model, source = treeview.get_selection().get_selected()
-            target = model.get_iter(target_path)
             if len(target_path) > 1 and target_path[0] == 0:
                 treeview.enable_model_drag_dest([LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION], Gdk.DragAction.MOVE)
             else:
@@ -2336,7 +2319,6 @@ class AuthorEditGUI:
         if event.button == 3:
             x = int(event.x)
             y = int(event.y)
-            time = event.time
             pthinfo = treeview.get_path_at_pos(x, y)
             if pthinfo is not None:
                 path, col, cellx, celly = pthinfo
@@ -2825,7 +2807,6 @@ class PaperEditGUI:
         if event.button == 3:
             x = int(event.x)
             y = int(event.y)
-            time = event.time
             pthinfo = treeview.get_path_at_pos(x, y)
             if pthinfo is not None:
                 path, col, cellx, celly = pthinfo
@@ -2849,7 +2830,6 @@ class PaperEditGUI:
         if event.button == 3:
             x = int(event.x)
             y = int(event.y)
-            time = event.time
             pthinfo = treeview.get_path_at_pos(x, y)
             if pthinfo is not None:
                 path, col, cellx, celly = pthinfo
@@ -2875,7 +2855,6 @@ class PaperEditGUI:
         if event.button == 3:
             x = int(event.x)
             y = int(event.y)
-            time = event.time
             pthinfo = treeview.get_path_at_pos(x, y)
             if pthinfo is not None:
                 path, col, cellx, celly = pthinfo

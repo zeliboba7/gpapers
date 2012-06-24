@@ -24,7 +24,6 @@ import traceback
 
 from gi.repository import Soup  # @UnresolvedImport
 import BeautifulSoup
-from django.template import defaultfilters
 
 from gpapers.logger import log_debug, log_info, log_error
 from gpapers.importer.bibtex import paper_info_from_bibtex
