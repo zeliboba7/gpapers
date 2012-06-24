@@ -16,12 +16,21 @@ python-beautifulsoup: 3.2.0-2build1
 
 In addition, gPapers contains code from the following sources:
 
-deseb
-    http://code.google.com/p/deseb/ 
-    Written by Derek Anderson, published under a BSD license
 desktop
     http://pypi.python.org/pypi/desktop
     Written by Paul Boddie, published under LGPLv3
 pyparsing parser for BibTeX
     http://pastebin.com/ZzU19NLJ
     Written by Matthew Brett, published under a simplified BSD license
+
+External Services
+=================
+gPapers is using the following external web services to allow searching for
+literature and to download metadata.
+
+Google Scholar: http://scholar.google.com/
+Pubmed: http://www.ncbi.nlm.nih.gov/pubmed/
+JSTOR's Data for Research (DfR) service: http://dfr.jstor.org
+
+The DOI service for resolving DOIs and downloading metadata: http://dx.doi.org/
+
