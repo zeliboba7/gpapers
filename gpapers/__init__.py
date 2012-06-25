@@ -1087,9 +1087,9 @@ class MainGUI:
 
         for _, provider in self.search_providers.iteritems():
             # FIXME: Load them in the providers
-            provider_icon = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR,
-                                                                        'icons',
-                                                                        provider.icon))
+            icon_fname = os.path.join(BASE_DIR, 'icons', provider.icon)
+            provider_icon = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_fname,
+                                                                   16, 16) #FIXME            
             self.left_pane_model.append(None, (provider.name,
                              provider_icon, -1, False, provider.label))
             for playlist in Playlist.objects.filter(parent=provider.label):
