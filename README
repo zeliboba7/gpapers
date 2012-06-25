@@ -13,12 +13,10 @@ gir1.2-soup-2.4: 2.38.0-0ubuntu1
 python-django: 1.3.1-4ubuntu1
 python-pdfminer: 20110515+dfsg-1
 python-beautifulsoup: 3.2.0-2build1
+python-feedparser: 5.1-0ubuntu3.1
 
 In addition, gPapers contains code from the following sources:
 
-desktop
-    http://pypi.python.org/pypi/desktop
-    Written by Paul Boddie, published under LGPLv3
 pyparsing parser for BibTeX
     http://pastebin.com/ZzU19NLJ
     Written by Matthew Brett, published under a simplified BSD license
@@ -31,6 +29,7 @@ literature and to download metadata.
 Google Scholar: http://scholar.google.com/
 Pubmed: http://www.ncbi.nlm.nih.gov/pubmed/
 JSTOR's Data for Research (DfR) service: http://dfr.jstor.org
+arXiv.org e-Print archive: http://arxiv.org
 
 The DOI service for resolving DOIs and downloading metadata: http://dx.doi.org/
 

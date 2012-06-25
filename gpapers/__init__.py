@@ -20,6 +20,8 @@
 #    You should have received a copy of the GNU General Public License
 #    along with gPapers.  If not, see <http://www.gnu.org/licenses/>.
 
+__version__ = '0.5dev'
+
 from datetime import datetime, timedelta, date
 import math
 import mimetypes
@@ -51,7 +53,7 @@ from gpapers.importer import bibtex, pdf_file
 from gpapers.gPapers.models import *
 import gpapers.importer as importer
 from gpapers.importer import pango_escape
-from gpapers.importer import pubmed, google_scholar, jstor
+from gpapers.importer import pubmed, google_scholar, jstor, arxiv
 
 log_level_debug()
 
@@ -74,7 +76,6 @@ BOOKMARK_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons',
 GRAPH_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons',
                                                          'drawing.png'))
 
-__version__ = '0.5dev'
 
 GObject.threads_init()
 
@@ -586,7 +587,8 @@ class MainGUI:
     def __init__(self):
         self.search_providers = {'pubmed' : pubmed.PubMedSearch(),
                          'google_scholar' : google_scholar.GoogleScholarSearch(),
-                         'jstor' : jstor.JSTORSearch()}
+                         'jstor' : jstor.JSTORSearch(),
+                         'arxiv' : arxiv.ArxivSearch()}
         self.displayed_paper = None
         self.ui = Gtk.Builder()
         self.ui.add_from_file(os.path.join(BASE_DIR, 'data', 'ui.xml'))
