@@ -21,8 +21,10 @@ from datetime import datetime
 from django.db import models
 import django.core.files.base
 
-from gpapers import desktop
-from gpapers.logger import log_debug
+from gi.repository import Gtk
+from gi.repository import Gdk
+
+from gpapers.logger import log_debug, log_error
 
 class Publisher(models.Model):
 
@@ -178,9 +180,12 @@ class Paper(models.Model):
 
     def open(self):
         if self.full_text and os.path.isfile(self.full_text.path):
-            desktop.open(self.full_text.path)
-            self.read_count = self.read_count + 1
-            self.save()
+            uri = 'file://' + self.full_text.path
+            if Gtk.show_uri(None, uri, Gdk.CURRENT_TIME):
+                self.read_count = self.read_count + 1
+                self.save()
+            else:
+                log_error('Failed to open %s' % uri)
 
     class Admin:
         list_display = ('id', 'doi', 'title')
