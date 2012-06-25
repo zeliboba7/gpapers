@@ -26,6 +26,7 @@ import mimetypes
 import os
 import sys
 import thread
+import time
 import traceback
 
 from gi.repository import Gio
@@ -47,7 +48,6 @@ from django.db.models.signals import post_save, post_delete
 
 from gpapers.logger import log_level_debug, log_warn, log_info, log_debug
 from gpapers.importer import bibtex, pdf_file
-import gpapers.desktop
 from gpapers.gPapers.models import *
 import gpapers.importer as importer
 from gpapers.importer import pango_escape
@@ -1681,7 +1681,8 @@ class MainGUI:
                 url = paper.import_url
                 if not url:
                     url = 'http://dx.doi.org/' + paper.doi
-                button.connect('clicked', lambda x: desktop.open(url))
+                button.connect('clicked',
+                               lambda x: Gtk.show_uri(None, url, Gdk.CURRENT_TIME))
                 paper_information_toolbar.insert(button, -1)
                 if paper.id != -1:
                     button = Gtk.ToolButton(stock_id=Gtk.STOCK_REFRESH)
@@ -1888,7 +1889,7 @@ class MainGUI:
         stdout.readlines()
         stdout.close()
         time.sleep(.1)
-        desktop.open(file)
+        Gtk.show_uri(None, 'file://' + file, Gdk.CURRENT_TIME)
 
     def update_bookmark_pane_from_paper(self, paper):
         toolbar_bookmarks = self.ui.get_object('toolbar_bookmarks')
