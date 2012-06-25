@@ -32,6 +32,7 @@ from gi.repository import Soup
 from django.template import defaultfilters
 import BeautifulSoup
 
+import gpapers
 from gpapers.logger import *
 from gpapers.gPapers.models import Paper
 
@@ -41,6 +42,8 @@ p_whitespace = re.compile('[\s]+')
 p_doi = re.compile('doi *: *(10.[a-z0-9]+/[a-z0-9.]+)', re.IGNORECASE)
 
 soup_session = Soup.SessionAsync()
+#arXiv disallows requests if no user-agent is set
+soup_session.set_property("user-agent", "gPapers/%s" % gpapers.__version__)
 
 
 def _decode_htmlentities(string):
