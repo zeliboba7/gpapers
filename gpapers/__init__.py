@@ -116,7 +116,7 @@ def make_all_columns_resizeable_clickable_ellipsize(columns):
         #column.connect('clicked', self.sortRows)
         for renderer in column.get_cells():
             if renderer.__class__.__name__ == 'CellRendererText':
-                renderer.set_property('ellipsize', Pango.EllipsizeMode.END)
+                renderer.set_property('ellipsize', Pango.EllipsizeMode.MIDDLE)
 
 
 def import_documents_via_filenames(filenames, callback):
@@ -989,7 +989,9 @@ class MainGUI:
 
         pane.connect('size-allocate', self.resize_paper_information_pane)
 
-        column = Gtk.TreeViewColumn("", Gtk.CellRendererText(), markup=0)
+        renderer = Gtk.CellRendererText()
+        renderer.set_property('yalign', 0.)
+        column = Gtk.TreeViewColumn("", renderer, markup=0)
         column.set_min_width(64)
         pane.append_column(column)
 
@@ -998,6 +1000,7 @@ class MainGUI:
         #renderer.set_property('editable', True)
         renderer.set_property('wrap-mode', Pango.WrapMode.WORD)
         renderer.set_property('wrap-width', 500)
+        
         column.pack_start(renderer, True)
         column.add_attribute(renderer, 'markup', 1)
         pane.append_column(column)
@@ -1605,13 +1608,23 @@ class MainGUI:
             if paper.title:
                 self.paper_information_pane_model.append(('<b>Title:</b>',
                                                           paper.title ,))
-            if liststore[rows[0]][0].authors:
+            if paper.authors:
                 author_str = ', '.join([ author.name for author in
                                         paper.get_authors_in_order() ])
                 self.paper_information_pane_model.append(('<b>Authors:</b>',
                                                           author_str,))
-#            if liststore[rows[0]][3]:
-#                self.paper_information_pane_model.append(('<b>Journal:</b>', liststore[rows[0]][3] ,))
+            if paper.source or paper.source_pages:
+                publication_string = ''
+                if paper.source.name:
+                    publication_string += '<i>' + pango_escape(paper.source.name) + '</i>.'
+                if paper.source.issue:
+                    publication_string += ' ' + pango_escape(paper.source.issue) + ':'
+                if paper.source_pages:
+                    publication_string += ' ' + pango_escape(paper.source_pages)
+                if paper.source.publication_date:
+                    publication_string += ', ' + pango_escape(unicode(paper.source.publication_date.year)) + '.'
+                self.paper_information_pane_model.append(('<b>Published in:</b>',
+                                                          publication_string,)) 
             if paper.doi:
                 self.paper_information_pane_model.append(('<b>DOI:</b>',
                                                           pango_escape(paper.doi) ,))
@@ -1642,7 +1655,9 @@ class MainGUI:
             #self.ui.get_object('paper_information_pane').get_buffer().set_text( '\n'.join(description) )            
 
             if paper.doi or paper.import_url:
-                button = Gtk.ToolButton(stock_id=Gtk.STOCK_HOME)
+                icon = Gtk.Image.new_from_icon_name('web-browser', 
+                                                    Gtk.IconSize.SMALL_TOOLBAR)
+                button = Gtk.ToolButton.new(icon, None)
                 button.set_tooltip_text('Open this URL in your browser...')
                 url = paper.import_url
                 if not url:
