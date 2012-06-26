@@ -187,9 +187,10 @@ class PubMedSearch(WebSearchProvider):
             except:
                 pass
 
-        callback(paper_info, None, user_data)
+        callback(paper_info=paper_info, user_data=user_data)
 
-    def import_paper_after_search(self, pubmed_id, paper, callback):
+    def import_paper_after_search(self, paper, callback):
+        pubmed_id = paper.data
         log_info('Trying to import pubmed citation with id %s' % pubmed_id)
         query = BASE_URL + EFETCH_QUERY % pubmed_id
         message = Soup.Message.new(method='GET', uri_string=query)

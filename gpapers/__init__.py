@@ -136,40 +136,6 @@ def make_all_columns_resizeable_clickable_ellipsize(columns):
                 renderer.set_property('ellipsize', Pango.EllipsizeMode.END)
 
 
-def fetch_citations_via_urls(urls):
-    log_info('trying to fetch: %s' % str(urls))
-    thread.start_new_thread(import_citations, (urls,))
-
-def fetch_citations_via_references(references):
-    log_info('trying to fetch: %s' % str(references))
-    thread.start_new_thread(import_citations_via_references, (references,))
-
-def import_citations(urls):
-    for url in urls:
-        
-        # display status message and delete it afterwards
-        main_gui.active_threads[url] = 'Importing %s' % url
-        def my_callback():
-            if url in main_gui.active_threads:
-                del main_gui.active_threads[url]
-            main_gui.refresh_middle_pane_search()
-            
-        importer.import_citation(url, callback=my_callback)
-
-
-def import_citations_via_references(references):
-    for reference in references:
-        if not reference.referenced_paper:
-            if reference.url_from_referencing_paper:
-                reference.referenced_paper = importer.import_citation(reference.url_from_referencing_paper)
-                reference.save()
-        if not reference.referencing_paper:
-            if reference.url_from_referenced_paper:
-                reference.referenced_paper = importer.import_citation(reference.url_from_referenced_paper)
-                reference.save()
-    main_gui.refresh_middle_pane_search()
-
-
 def import_documents_via_filenames(filenames, callback):
     '''
     Adds existing files or directories to the database and copies the documents
@@ -379,18 +345,31 @@ class MainGUI:
         except Paper.DoesNotExist:
             log_warn('No paper in the database has DOI %s -- aborting.' % doi)
 
-    def document_imported(self, paper_info, paper_data, user_data):
+    def document_imported(self, paper_obj=None, paper_info=None, 
+                          paper_data=None, user_data=None):
         '''
-        Should be called after a paper is imported. `paper_info` is a
-        dictionary with document metadata, `paper_data` is the PDF itself.
+        Should be called after a paper is imported. `paper_obj` is a
+        :class:`gpapers.model.VirtualPaper` object (in case the document is
+        imported after a search), `paper_info` is a dictionary with document
+        metadata, `paper_data` is the PDF itself.
         '''
 
-        if user_data in self.active_threads:
-            del self.active_threads[str(user_data)]
-
-        if paper_data is None and paper_info is None:
+        if paper_data is None and paper_info is None and paper_obj is None:
             # FIXME: This should be handled via an error callback
             return
+
+        if paper_obj is not None:
+            # This is a paper imported after a search, merge its info with 
+            # any additional info in paper_info (overwriting infos in the
+            # paper object info -- e.g. google search gives very imprecise
+            # results for a search but the BibTeX contains more accurate
+            # info)
+            if paper_info is None:
+                paper_info = {}            
+            
+            for key in paper_obj.paper_info:
+                if not key in paper_info:
+                        paper_info[key] = paper_obj.paper_info[key]
 
         if paper_data is not None:
             
@@ -453,7 +432,6 @@ class MainGUI:
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             url = entry.get_text()
-            importer.active_threads[url] = 'Importing %s' % url
             importer.import_from_url(url, self.document_imported)
 
         dialog.destroy()
@@ -479,7 +457,6 @@ class MainGUI:
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             url = 'http://dx.doi.org/' + entry.get_text().strip()
-            importer.active_threads[url] = 'Importing DOI'
             importer.import_from_url(url, self.document_imported)
 
         dialog.destroy()
@@ -579,8 +556,7 @@ class MainGUI:
                 importer.import_from_url(url, self.document_imported,
                                          paper_info=paper_info)
             else:
-                self.document_imported(paper_info, paper_data=None,
-                                       user_data=None)
+                self.document_imported(paper_info=paper_info)
 
         dialog.destroy()
 
@@ -1536,7 +1512,7 @@ class MainGUI:
                         # Get the actual file content 
                         file_content = file_object.load_contents_finish(asyncresult)[1]
         
-                        self.document_imported(paper_data=file_content, paper_info=None,
+                        self.document_imported(paper_data=file_content,
                                                user_data=user_data)
     
                     import_documents_via_filenames([filename], mycallback)
@@ -1555,8 +1531,7 @@ class MainGUI:
                             importer.import_from_url(url, self.document_imported,
                                                      paper_info=paper_info)
                         else:
-                            self.document_imported(paper_info, paper_data=None,
-                                                   user_data=None)
+                            self.document_imported(paper_info=paper_info)
                     gfile = Gio.File.new_for_uri(data.strip())
                     # first argument is the `cancellable` object
                     gfile.load_contents_async(None, mycallback, data.strip())                                    
@@ -1616,10 +1591,6 @@ class MainGUI:
         playlist.title = new_text
         playlist.save()
         self.refresh_left_pane()
-
-    def import_citation_via_middle_top_pane_row(self, row):
-        paper_obj = row[0]
-        importer.get_or_create_paper_via(paper_obj, callback=self.document_imported)
 
     def select_middle_top_pane_item(self, selection):
         liststore, rows = selection.get_selected_rows()
@@ -1686,20 +1657,25 @@ class MainGUI:
                 button.connect('clicked',
                                lambda x: Gtk.show_uri(None, url, Gdk.CURRENT_TIME))
                 paper_information_toolbar.insert(button, -1)
-                if paper.id != -1:
-                    button = Gtk.ToolButton(stock_id=Gtk.STOCK_REFRESH)
-                    button.set_tooltip_text('Re-add this paper to your library...')
-                    
-                    button.connect('clicked', lambda x: self.import_citation_via_middle_top_pane_row(liststore[rows[0]]))
-                    paper_information_toolbar.insert(button, -1)
+                # TODO: Re-think this, possibly should either download a PDF
+                # if this is missing but the import_url or DOI is known or 
+                # download additional metadata via the import_url/DOI
+#                if paper.id != -1:
+#                    button = Gtk.ToolButton(stock_id=Gtk.STOCK_REFRESH)
+#                    button.set_tooltip_text('Re-add this paper to your library...')
+#                    
+#                    button.connect('clicked', lambda x: self.import_citation_via_middle_top_pane_row(liststore[rows[0]]))
+#                    paper_information_toolbar.insert(button, -1)
 
             if paper.id == -1 and hasattr(paper, 'provider'):  # This is a search result
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_ADD)
                 button.set_tooltip_text('Add this paper to your library...')
-                button.connect('clicked',
-                               lambda x: paper.provider.import_paper_after_search(paper.data,
-                                                                                  paper,
-                                                                                  self.document_imported))
+                
+                def import_paper_callback():
+                    paper.provider.import_paper_after_search(paper,
+                                                             self.document_imported)
+                button.connect('clicked', lambda x: import_paper_callback())
+                
                 paper_information_toolbar.insert(button, -1)
             elif paper.id != -1:
                 importable_references = set()
@@ -1734,38 +1710,39 @@ class MainGUI:
                     button.connect('clicked', lambda x: self.remove_papers_from_current_playlist([paper.id]))
                     paper_information_toolbar.insert(button, -1)
 
-                if importable_references or importable_citations:
-                    import_button = Gtk.MenuToolButton(stock_id=Gtk.STOCK_ADD)
-                    import_button.set_tooltip_text('Import all cited and referenced documents...(%i)' % len(importable_references.union(importable_citations)))
-                    import_button.connect('clicked', lambda x: fetch_citations_via_references(importable_references.union(importable_citations)))
-                    paper_information_toolbar.insert(import_button, -1)
-                    import_button_menu = Gtk.Menu()
-                    if importable_citations:
-                        menu_item = Gtk.MenuItem('Import all cited documents (%i)' % len(importable_citations))
-                        menu_item.connect('activate', lambda x: fetch_citations_via_references(importable_citations))
-                        import_button_menu.append(menu_item)
-                        menu_item = Gtk.MenuItem('Import specific cited document')
-                        import_button_submenu = Gtk.Menu()
-                        for citation in importable_citations:
-                            submenu_item = Gtk.MenuItem(truncate_long_str(citation.line_from_referenced_paper))
-                            submenu_item.connect('activate', lambda x: fetch_citations_via_references((citation,)))
-                            import_button_submenu.append(submenu_item)
-                        menu_item.set_submenu(import_button_submenu)
-                        import_button_menu.append(menu_item)
-                    if importable_references:
-                        menu_item = Gtk.MenuItem('Import all referenced documents (%i)' % len(importable_references))
-                        menu_item.connect('activate', lambda x: fetch_citations_via_references(importable_references))
-                        import_button_menu.append(menu_item)
-                        menu_item = Gtk.MenuItem('Import specific referenced document')
-                        import_button_submenu = Gtk.Menu()
-                        for reference in importable_references:
-                            submenu_item = Gtk.MenuItem(truncate_long_str(reference.line_from_referencing_paper))
-                            submenu_item.connect('activate', lambda x: fetch_citations_via_references((reference,)))
-                            import_button_submenu.append(submenu_item)
-                        menu_item.set_submenu(import_button_submenu)
-                        import_button_menu.append(menu_item)
-                    import_button_menu.show_all()
-                    import_button.set_menu(import_button_menu)
+# TODO: Check how the references/citations are supposed to work
+#                if importable_references or importable_citations:
+#                    import_button = Gtk.MenuToolButton(stock_id=Gtk.STOCK_ADD)
+#                    import_button.set_tooltip_text('Import all cited and referenced documents...(%i)' % len(importable_references.union(importable_citations)))
+#                    import_button.connect('clicked', lambda x: fetch_citations_via_references(importable_references.union(importable_citations)))
+#                    paper_information_toolbar.insert(import_button, -1)
+#                    import_button_menu = Gtk.Menu()
+#                    if importable_citations:
+#                        menu_item = Gtk.MenuItem('Import all cited documents (%i)' % len(importable_citations))
+#                        menu_item.connect('activate', lambda x: fetch_citations_via_references(importable_citations))
+#                        import_button_menu.append(menu_item)
+#                        menu_item = Gtk.MenuItem('Import specific cited document')
+#                        import_button_submenu = Gtk.Menu()
+#                        for citation in importable_citations:
+#                            submenu_item = Gtk.MenuItem(truncate_long_str(citation.line_from_referenced_paper))
+#                            submenu_item.connect('activate', lambda x: fetch_citations_via_references((citation,)))
+#                            import_button_submenu.append(submenu_item)
+#                        menu_item.set_submenu(import_button_submenu)
+#                        import_button_menu.append(menu_item)
+#                    if importable_references:
+#                        menu_item = Gtk.MenuItem('Import all referenced documents (%i)' % len(importable_references))
+#                        menu_item.connect('activate', lambda x: fetch_citations_via_references(importable_references))
+#                        import_button_menu.append(menu_item)
+#                        menu_item = Gtk.MenuItem('Import specific referenced document')
+#                        import_button_submenu = Gtk.Menu()
+#                        for reference in importable_references:
+#                            submenu_item = Gtk.MenuItem(truncate_long_str(reference.line_from_referencing_paper))
+#                            submenu_item.connect('activate', lambda x: fetch_citations_via_references((reference,)))
+#                            import_button_submenu.append(submenu_item)
+#                        menu_item.set_submenu(import_button_submenu)
+#                        import_button_menu.append(menu_item)
+#                    import_button_menu.show_all()
+#                    import_button.set_menu(import_button_menu)
 
                     button = Gtk.ToolButton() # GRAPH_ICON
                     icon = Gtk.Image()
@@ -1780,16 +1757,27 @@ class MainGUI:
             self.update_bookmark_pane_from_paper(None)
             self.paper_information_pane_model.append(('<b>Number of papers:</b>', str(len(rows)) ,))
 
-            downloadable_paper_urls = set()
+            papers = []
             for row in rows:
                 paper = liststore[row][0]
-                if paper.import_url and paper.id == -1:
-                    downloadable_paper_urls.add(paper.import_url)
-            if len(downloadable_paper_urls):
-                self.paper_information_pane_model.append(('<b>Number of new papers:</b>', str(len(downloadable_paper_urls)) ,))
+                if paper.id == -1 and hasattr(paper, 'provider'):
+                    papers.append(paper)
+            if len(papers):
+                self.paper_information_pane_model.append(('<b>Number of new papers:</b>', str(len(papers)) ,))
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_ADD)
-                button.set_tooltip_text('Add new papers (%i) to your library...' % len(downloadable_paper_urls))
-                button.connect('clicked', lambda x: fetch_citations_via_urls(downloadable_paper_urls))
+                button.set_tooltip_text('Add new papers (%i) to your library...' % len(papers))
+                
+                # These should all be from the same search provider
+                provider = papers[0].provider
+                for paper in papers:
+                    assert(paper.provider == provider)
+                
+                # Download the papers
+                def import_papers_callback():                    
+                    paper.provider.import_papers_after_search(papers,
+                                                              self.document_imported)
+
+                button.connect('clicked', lambda x: import_papers_callback())
                 paper_information_toolbar.insert(button, -1)
 
             selected_valid_paper_ids = []
