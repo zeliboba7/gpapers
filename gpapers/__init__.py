@@ -1601,8 +1601,6 @@ class MainGUI:
             paper_information_toolbar.remove(child)
         self.displayed_paper = None
 
-        log_debug('rows: %s' % str(rows))
-
         if not rows or len(rows) == 0:
             self.update_bookmark_pane_from_paper(None)
         elif len(rows) == 1:
@@ -1648,7 +1646,6 @@ class MainGUI:
             #self.ui.get_object('paper_information_pane').get_buffer().set_text( '\n'.join(description) )            
 
             if paper.doi or paper.import_url:
-                log_debug('URL or DOI exists')
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_HOME)
                 button.set_tooltip_text('Open this URL in your browser...')
                 url = paper.import_url
