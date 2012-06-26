@@ -7,5 +7,6 @@ Reference
     reference-gpapers
     reference-logger
     reference-importer
+    reference-model
 
 
