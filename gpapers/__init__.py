@@ -1698,6 +1698,7 @@ class MainGUI:
                 button.set_tooltip_text('Add this paper to your library...')
                 button.connect('clicked',
                                lambda x: paper.provider.import_paper_after_search(paper.data,
+                                                                                  paper,
                                                                                   self.document_imported))
                 paper_information_toolbar.insert(button, -1)
             elif paper.id != -1:
