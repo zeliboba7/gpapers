@@ -149,20 +149,7 @@ def parse_str(str):
 
 def latex2unicode(s):
     """
-    *  \`{o} produces a grave accent
-    * \'{o} produces an acute accent
-    * \^{o} produces a circumflex
-    * \"{o} produces an umlaut or dieresis
-    * \H{o} produces a long Hungarian umlaut
-    * \~{o} produces a tilde
-    * \c{c} produces a cedilla
-    * \={o} produces a macron accent (a bar over the letter)
-    * \b{o} produces a bar under the letter
-    * \.{o} produces a dot over the letter
-    * \d{o} produces a dot under the letter
-    * \u{o} produces a breve over the letter
-    * \v{o} produces a "v" over the letter
-    * \t{oo} produces a "tie" (inverted u) over the two letters
+    Not useful at the moment.    
     """
     # TODO: expand this to really work
     return s
