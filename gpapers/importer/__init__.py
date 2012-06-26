@@ -20,6 +20,7 @@
 import os
 import re
 import traceback
+import time
 from htmlentitydefs import name2codepoint as n2cp
 import urllib
 import urlparse
@@ -78,215 +79,6 @@ def _substitute_entity(match):
             return unichr(cp)
         else:
             return match.group()
-
-
-def get_or_create_paper_via(paper_obj, callback, full_text_md5=None):
-
-    paper_id = paper_obj.id
-    doi = paper_obj.doi
-    pubmed_id = paper_obj.pubmed_id
-    import_url = paper_obj.import_url
-    title = paper_obj.title
-    provider = paper_obj.provider
-    data = paper_obj.data
-
-    paper = None
-
-    if paper_id >= 0:
-        try: paper = Paper.objects.get(id=paper_id)
-        except: pass
-
-    if doi:
-        if paper:
-            if not paper.doi:
-                paper.doi = doi
-        else:
-            try: paper = Paper.objects.get(doi=doi)
-            except: pass
-
-    if pubmed_id:
-        if paper:
-            if not paper.pubmed_id:
-                paper.pubmed_id = pubmed_id
-        else:
-            try: paper = Paper.objects.get(pubmed_id=pubmed_id)
-            except: pass
-
-    if import_url:
-        if paper:
-            if not paper.import_url:
-                paper.import_url = import_url
-        else:
-            try: paper = Paper.objects.get(import_url=import_url)
-            except: pass
-
-    if full_text_md5:
-        if not paper:
-            try: paper = Paper.objects.get(full_text_md5=full_text_md5)
-            except: pass
-
-    if title:
-        if paper:
-            if not paper.title:
-                paper.title = title
-        else:
-            try: paper = Paper.objects.get(title=title)
-            except: pass
-
-    if not paper:
-        # it looks like we haven't seen this paper before...
-        if provider:
-            # Get the paper from the search provider
-            provider.import_paper_after_search(data, callback=callback)
-        else:
-            if not doi:
-                doi = ''
-            if not pubmed_id:
-                pubmed_id = ''
-            if not import_url:
-                import_url = ''
-            if not title:
-                title = ''
-            paper = Paper.objects.create(doi=doi, pubmed_id=pubmed_id,
-                                         import_url=import_url, title=title)
-            # we are done, call the callback
-            callback(paper)
-
-
-#TODO: Refactor import_pdf into a new function 
-def import_citation(url, paper=None, callback=None):
-
-    log_info('Importing URL: %s' % url)
-
-    active_threads[ str(thread.get_ident()) ] = 'importing: ' + url
-    try:
-        response = urllib.urlopen(url)
-        if response.getcode() != 200 and response.getcode() != 302:
-            log_error('unable to download: %s  (%i)' % (url, response.getcode()))
-            return
-
-        data = response.read(-1)
-        info = response.info()
-
-        if info.gettype() == 'application/pdf' or info.gettype() == 'application/octet-stream':
-            # this is hopefully a PDF file                     
-
-            #Try finding a PDF file name in the url
-            parsed_url = urlparse.urlsplit(url)
-            filename = os.path.split(parsed_url.path)[1]
-
-            if os.path.splitext(filename)[1].lower() != '.pdf':
-                filename = None
-                #That didn't work, try to find a filename in the query string
-                query = urlparse.parse_qs(parsed_url.query)
-                for key in query:
-                    print key, query[key]
-                    if os.path.splitext(query[key][0])[1].lower() == '.pdf':
-                        filename = query[key].lower() # found a .pdf name
-                        break
-
-            log_info('importing paper: %s' % filename)
-
-            if not paper:
-                md5_hexdigest = get_md5_hexdigest_from_data(data)
-                # FIXME
-                paper, created = get_or_create_paper_via(full_text_md5=md5_hexdigest)
-                if created:
-                    if not filename:
-                        filename = md5_hexdigest # last resort for filename
-
-                    paper.save_file(defaultfilters.slugify(filename.replace('.pdf', '')) + '.pdf',
-                                    data)
-                    paper.import_url = response.geturl()
-                    paper.save()
-                    log_info('imported paper: %s' % filename)
-                else:
-                    log_info('paper already exists: %s' % str(paper))
-            else:
-                paper.save_file(defaultfilters.slugify(filename.replace('.pdf', '')) + '.pdf',
-                                 local_file.read())
-                paper.import_url = response.geturl()
-                paper.save()
-            return paper
-
-        # let's see if there's a pdf somewhere in here...
-        paper = _import_unknown_citation(data, response.geturl(), paper=paper)
-        if paper and callback:callback()
-        if paper: return paper
-
-    except:
-        traceback.print_exc()
-        Gdk.threads_enter()
-        error = Gtk.MessageDialog(type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, flags=Gtk.DialogFlags.MODAL)
-        error.connect('response', lambda x, y: error.destroy())
-        error.set_markup('<b>Unknown Error</b>\n\nUnable to download this resource.')
-        error.run()
-        Gdk.threads_leave()
-
-    Gdk.threads_enter()
-    error = Gtk.MessageDialog(type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, flags=Gtk.DialogFlags.MODAL)
-    error.connect('response', lambda x, y: error.destroy())
-    error.set_markup('<b>No Paper Found</b>\n\nThe given URL does not appear to contain or link to any PDF files. (perhaps you have it buy it?) Try downloading the file and adding it using "File &gt;&gt; Import..."\n\n%s' % pango_escape(url))
-    error.run()
-    Gdk.threads_leave()
-    if active_threads.has_key(str(thread.get_ident())):
-        del active_threads[str(thread.get_ident())]
-
-
-def _import_unknown_citation(data, orig_url, paper=None):
-
-    # soupify
-    soup = BeautifulSoup.BeautifulSoup(data)
-
-    # search for bibtex link
-    for a in soup.findAll('a'):
-        for c in a.contents:
-            if str(c).lower().find('bibtex') != -1:
-                log_debug('found bibtex link: %s' % a)
-                #TODO: Do something with bibtex link
-
-    # search for ris link
-    for a in soup.findAll('a'):
-        if not a.has_key('href'):
-            continue
-        href = a['href']
-        if href.find('?') > 0: href = href[ : href.find('?') ]
-        if href.lower().endswith('.ris'):
-            log_debug('found RIS link: %s' % a)
-            break
-        for c in a.contents:
-            c = str(c).lower()
-            if c.find('refworks') != -1 or c.find('procite') != -1 or c.find('refman') != -1 or c.find('endnote') != -1:
-                log_debug('found RIS link: %s' % a)
-                #TODO: Do something with ris link
-
-    # search for pdf link
-    # TODO: If more than one link is found, present the choice to the user
-    pdf_link = None
-    for a in soup.findAll('a'):
-        if pdf_link:
-            break
-        if not a.has_key('href'):
-            continue
-        href = a['href']
-        if href.lower() == orig_url.lower(): #this is were we came from...
-            continue
-        if href.find('?') > 0: href = href[ : href.find('?') ]
-        if href.lower().endswith('pdf'):
-            pdf_link = a['href']
-            log_debug('found PDF link: %s' % a)
-            break
-        for c in a.contents:
-            c = str(c).lower()
-            if c.find('pdf') != -1:
-                log_debug('found PDF link: %s' % a)
-                pdf_link = a['href']
-                break
-
-    if pdf_link:
-        #Combine the base URL with the PDF link (necessary for relative URLs)
-        pdf_link = urlparse.urljoin(orig_url, pdf_link)
-        return import_citation(pdf_link)
 
 
 def get_bibtex_for_doi(doi, callback):
@@ -350,12 +142,16 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
     (binary data) as an argument.
     '''
 
+    importer.active_threads[url] = 'Importing %s' % url
+
     def data_received(session, message, user_data):
         if not message.status_code == Soup.KnownStatusCode.OK:
             # FIXME: Use error handler here
             log_warn('URL %s responded with error code %d' % (user_data,
                                                               message.status_code))
-            callback(None, None, user_data)
+            if url in importer.active_threads: 
+                del importer.active_threads[url]
+            callback(user_data=user_data)
             return
 
         log_debug('Response received (status code OK)')
@@ -376,9 +172,14 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
                                                            message.get_uri()))
 
         if content_type == 'application/pdf':
-            callback(paper_info, data, user_data)
+            if url in importer.active_threads: 
+                del importer.active_threads[url]
+            callback(paper_info=paper_info, paper_data=data, user_data=user_data)
         elif (content_type == 'text/x-bibtex' or first_letter == '@') and not paper_info:
-            callback(bibtex.paper_info_from_bibtex(data), paper_data, user_data)
+            if url in importer.active_threads: 
+                del importer.active_threads[url]
+            callback(paper_info=bibtex.paper_info_from_bibtex(data),
+                     paper_data=paper_data, user_data=user_data)
         elif content_type == 'text/html':
             log_debug('Searching page for links')
             parsed = BeautifulSoup.BeautifulSoup(data)
@@ -419,13 +220,20 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
                 #Combine the base URL with the PDF link (necessary for relative URLs)
                 urls = [urlparse.urljoin(orig_url, url) for url in urls]
                 log_debug('Calling import_from_urls with %s' % str(urls))
+                if url in importer.active_threads: 
+                    del importer.active_threads[url]
                 import_from_urls(urls, callback, user_data)
             else:
                 log_warn('Nothing found...')
-                callback(paper_info, paper_data, user_data)
+                if url in importer.active_threads: 
+                    del importer.active_threads[url]
+                callback(paper_info=paper_info, paper_data=paper_data,
+                         user_data=user_data)
         else:
             log_warn('Do not know what to do with content type %s of URL %s' % (content_type, orig_url))
-            callback(paper_info, paper_data, user_data)
+            if url in importer.active_threads: 
+                del importer.active_threads[url]
+            callback(paper_info=paper_info, paper_data=paper_data, user_data=user_data)
 
     try:
         message = Soup.Message.new(method='GET', uri_string=url)
@@ -438,6 +246,8 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
         soup_session.queue_message(message, data_received, url)
         log_debug('Message queued')
     else:
+        if url in importer.active_threads: 
+            del importer.active_threads[url]
         callback(paper_info, paper_data, url)
 
 
@@ -494,14 +304,15 @@ def import_from_urls(urls, callback, user_data):
     as an argument.
     '''
     if urls is None:
-        callback(None, None, user_data)
+        callback(user_data=user_data)
 
     log_info(('Starting to look for PDF and/or metadata '
              'from %d possible URLs' % len(urls)))
 
     def _import_from_urls_finished(paper_info, paper_data, user_data):
         log_debug('_import_from_urls_finished')
-        callback(paper_info, paper_data, user_data)
+        callback(paper_info=paper_info, paper_data=paper_data,
+                 user_data=user_data)
 
     _import_from_urls(urls, _import_from_urls_finished, user_data)
 
@@ -544,19 +355,15 @@ class WebSearchProvider(object):
     This method should not block but use the :class:`AsyncSoupSession` object
     `importer.soup_session` for getting the information. 
 
-    * `import_paper_after_search(self, data, paper, callback)`
-    This method receives the `data` (if any) previously returned from the
-    :method:`search_async` method and a :class:`Paper` object, already
+    * `import_paper_after_search(self, paper, callback)`
+    This method receives the a :class:`VirtualPaper` object, already
     filled with the information previously returned from the search. It should
     call the callback when it is finished processing (which may include getting
     more information from webpages -- in this case the :class:`AsyncSoupSession`
     object `importer.soup_session` should be used to asynchronously fetch the 
-    page(s)). The callback function has to be called with the same :class:`Paper`
-    object (with any additional information now available filled in, generated
-    :class:`Author` objects, etc.) as the first argument. Optionally, a list of
-    URL strings can be given as the second argument, these URLs will be used 
-    in the order they are given, i.e. if fetching the document from the first
-    one is not successful, the second one will be tried etc. 
+    page(s)). The callback function has to be called with ...
+    
+    TODO
 
     The :method:`__init__` method of the subclass has to call the 
     :method:`__init__` method of the superclass.   
@@ -610,8 +417,30 @@ class WebSearchProvider(object):
         except Exception as ex:
             error_callback(ex, None)
 
-    def import_paper_after_search(self, data, paper, callback):
+    def import_paper_after_search(self, paper, callback):
         raise NotImplementedError()
+
+    def import_papers_after_search(self, papers, callback):
+        
+        identifier = '%s_%f' % (self.label, time.time()) #only used for status message
+        
+        def import_all_papers(paper_list):
+            active_threads[identifier] = 'Importing %d papers' % len(paper_list)
+            def my_callback(paper_obj=None, paper_data=None, paper_info=None,
+                            user_data=None):
+                
+                callback(paper_obj=paper_obj, paper_data=paper_data,
+                         paper_info=paper_info, user_data=user_data)
+                import_all_papers(paper_list)
+            
+            if len(paper_list):
+                one_paper = paper_list.pop()
+                self.import_paper_after_search(one_paper, my_callback)
+            else:
+                if identifier in active_threads:
+                    del active_threads[identifier]
+        
+        import_all_papers(papers)
 
     def search_async(self, search_string, callback, error_callback):
         raise NotImplementedError()
@@ -663,9 +492,30 @@ class SimpleWebSearchProvider(WebSearchProvider):
         else:
             error_callback(message.status_code, None)
 
-    def import_paper_after_search(self, data, paper, callback):
-        # Nothing to add
-        callback(paper, [], self.label)
+    def import_paper_after_search(self, paper_obj, callback):
+        # in case the paper already had an import URL, download from this URL
+        if hasattr(paper_obj, 'import_url') and paper_obj.import_url:
+            message = Soup.Message.new(method='GET',
+                                       uri_string=paper_obj.import_url)
+            
+            def mycallback(session, message, user_data):
+                if message.status_code == Soup.KnownStatusCode.OK:
+                    log_debug("%s: received pdf length %s" % (self.__class__.__name__,
+                                                              message.response_body.length))
+                    callback(paper_obj=paper_obj,
+                             paper_data=message.response_body.flatten().get_data(),
+                             user_data=user_data)
+                else:
+                    log_error("%: got status %s while trying to fetch PDF" % (self.__class__.__name__,
+                                                                              message.status_code))
+                    callback(paper_obj=paper_obj, user_data=user_data)
+            
+            log_debug("%s: trying to fetch %s" % (self.__class__.__name__,
+                                                  paper_obj.import_url))
+            soup_session.queue_message(message, mycallback,
+                                       (self.label, paper_obj.import_url))
+        else:
+            callback(paper_obj=paper_obj, user_data=self.label)
 
     # -------------------------------------------------------------------------
     # Methods to overwrite in sub classes

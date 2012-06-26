@@ -114,5 +114,3 @@ class ArxivSearch(SimpleWebSearchProvider):
                 log_error("arxiv: error while reading item: %s" % ex[0])
         
         return papers
-    
-    

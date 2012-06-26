@@ -304,6 +304,7 @@ class VirtualPaper(object):
         '''
 
         self.id = -1
+        self.paper_info = paper_info # save the complete info for later reuse
         self.provider = provider  # The origin of this search result
         self.authors = []
         self.source = VirtualSource()
