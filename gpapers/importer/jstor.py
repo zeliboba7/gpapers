@@ -20,8 +20,8 @@
 from gi.repository import Soup
 from BeautifulSoup import BeautifulStoneSoup
 
-from gpapers.importer import SimpleWebSearchProvider
-from gpapers.logger import *
+from gpapers.importer.provider_base import WebSearchProvider
+from gpapers.logger import log_debug
 
 QUERY_STRING = 'http://dfr.jstor.org/sru/?version=1.1&' + \
                    'operation=searchRetrieve&query=%(query)s&' + \
@@ -29,14 +29,14 @@ QUERY_STRING = 'http://dfr.jstor.org/sru/?version=1.1&' + \
                    'recordSchema=info:srw/schema/srw_jstor'
 
 
-class JSTORSearch(SimpleWebSearchProvider):
+class JSTORSearch(WebSearchProvider):
 
     name = 'JSTOR'
     label = 'jstor'
     icon = 'favicon_jstor.ico'
 
     def __init__(self):
-        SimpleWebSearchProvider.__init__(self)
+        WebSearchProvider.__init__(self)
         # TODO: Make this configurable
         self.max_results = 20
 
@@ -101,4 +101,3 @@ class JSTORSearch(SimpleWebSearchProvider):
             papers.append(paper)
 
         return papers
-

@@ -24,7 +24,8 @@ from BeautifulSoup import BeautifulStoneSoup
 from gi.repository import Soup  # @UnresolvedImport
 
 from gpapers.logger import log_debug, log_info, log_error
-from gpapers.importer import WebSearchProvider, soup_session
+from gpapers.importer import soup_session
+from gpapers.importer.provider_base import WebSearchProvider
 
 BASE_URL = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
 ESEARCH_QUERY = 'esearch.fcgi?db=pubmed&term=%s&usehistory=y'

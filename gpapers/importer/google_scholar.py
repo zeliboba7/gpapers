@@ -27,12 +27,13 @@ import BeautifulSoup
 
 from gpapers.logger import log_debug, log_info, log_error
 from gpapers.importer.bibtex import paper_info_from_bibtex
-from gpapers.importer import SimpleWebSearchProvider, html_strip, soup_session
+from gpapers.importer import html_strip, soup_session
+from gpapers.importer.provider_base import WebSearchProvider
 
 BASE_URL = 'http://scholar.google.com/'
 
 
-class GoogleScholarSearch(SimpleWebSearchProvider):
+class GoogleScholarSearch(WebSearchProvider):
 
     name = 'Google Scholar'
     label = 'google_scholar'
@@ -40,7 +41,7 @@ class GoogleScholarSearch(SimpleWebSearchProvider):
     unique_key = 'import_url'
 
     def __init__(self):
-        SimpleWebSearchProvider.__init__(self)
+        WebSearchProvider.__init__(self)
 
         # create a "google ID" used later for setting our preferences instead
         # of using a cookie
