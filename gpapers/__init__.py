@@ -1995,8 +1995,8 @@ class MainGUI:
     def delete_object(self, text, obj, update_function):
         '''
         Asks for confirmation before deleting an object and calling an update
-        function (e.g. :method:`refresh_left_pane`). Is called by the
-        more specific methods like :method:`delete_playlist` etc.
+        function (e.g. :meth:`refresh_left_pane`). Is called by the
+        more specific methods like :meth:`delete_playlist` etc.
         '''
         dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION,
                                    buttons=Gtk.ButtonsType.YES_NO,

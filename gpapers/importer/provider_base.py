@@ -33,55 +33,63 @@ class WebSearchProvider(object):
 
     Implementation of new search providers should derive from this class and
     have to provide the following attributes as class attributes:
-    * `name`: A human readable name that is used in the left column of the GUI,
-              e.g. "Google Scholar".
-    * `label`: A simple name that is used for saving searches to the database, 
-               e.g. "gscholar"
-    * `icon` : The name of an icon (expected in the `icons` subdirectory
-               currently) used in the left column of the GUI, e.g.
-               "favicon_google.ico". If no icon name is provided, a standard
-               icon is used.
-    * `unique_key`: Defining under what circumstances a search result should be
-                    onsidered a duplicate of an existing paper in the
-                    database. For a PubMED search, for example, this should be
-                    'pubmed_id'. If the unique key is not set, 'doi' is used
-                    as a default.
+    
+    `name`
+        A human readable name that is used in the left column of the GUI,
+        e.g. "Google Scholar".
+    `label`
+        A simple name that is used for saving searches to the database, 
+        e.g. "gscholar"
+    `icon`
+        The name of an icon (expected in the `icons` subdirectory
+        currently) used in the left column of the GUI, e.g.
+        "favicon_google.ico". If no icon name is provided, a standard
+        icon is used.
+    `unique_key`
+        Defining under what circumstances a search result should be
+        considered a duplicate of an existing paper in the
+        database. For a PubMED search, for example, this should be
+        'pubmed_id'. If the unique key is not set, 'doi' is used
+        as a default.
 
     In the simplest case (for the search, a single request to a website is 
     sufficient and that is all the data that is needed for an import), it is
     enough to overwrite two relatively simple methods (see
     :class:`importer.jstor.JSTORSearch` for an example):
-    * prepare_search_message(self, search_string)
-          Has to construct and return a `Soup.Message` object using
-          `Soup.Message.new`, for example:
-          ..                     
-              return Soup.Message.new(method='GET',
-                                      uri_string='http://example.com/search?query=search_string')  
+    
+    .. method:: prepare_search_message(self, search_string)
+    
+       Has to construct and return a `Soup.Message` object using
+       `Soup.Message.new`.
 
-    * parse_response(self, response):
-      Receives the HTML response of the website and should return a list of
-      paper info dictionaries (see :method:`search_async`).
+    .. method:: parse_response(self, response):
+    
+       Receives the HTML response of the website and should return a list of
+       paper info dictionaries (see :meth:`search_async`).
 
     For more complex scenarios, the following methods can be overwritten:
-    * `search_async(self, search_string, callback)`
-    This method receives a search string from the GUI and should call the
-    callback with a list of paper info dictionaries (see :method:`search_async`)
     
-    * `import_paper_after_search(self, paper, callback)`
-    This method receives the a :class:`VirtualPaper` object, already
-    filled with the information previously returned from the search. It should
-    call the callback when it is finished processing (which may include getting
-    more information from webpages -- in this case the :class:`AsyncSoupSession`
-    object `importer.soup_session` should be used to asynchronously fetch the 
-    page(s)) (see :method:`import_paper_after_search`). 
+    .. method:: search_async(self, search_string, callback)
+    
+       This method receives a search string from the GUI and should call the
+       callback with a list of paper info dictionaries (see :meth:`search_async`)
+    
+    .. method:: import_paper_after_search(self, paper, callback)
+    
+       This method receives the a :class:`VirtualPaper` object, already
+       filled with the information previously returned from the search. It should
+       call the callback when it is finished processing (which may include getting
+       more information from webpages -- in this case the :class:`AsyncSoupSession`
+       object `importer.soup_session` should be used to asynchronously fetch the 
+       page(s)) (see :meth:`import_paper_after_search`). 
     
     In case that the website supports the downloading of multiple papers at
     once, it may also be more efficient to use this operation by overwriting
-    :method:`import_papers_after_search` which otherwise will call
-    :method:`import_paper_after_search` for each paper.
+    :meth:`import_papers_after_search` which otherwise will call
+    :meth:`import_paper_after_search` for each paper.
     
-    Note that if the subclass overwrites the :method:`__init__` method, it has
-    to call the :method:`__init__` of its superclass.        
+    Note that if the subclass overwrites the :meth:`__init__` method, it has
+    to call the :meth:`__init__` of its superclass.        
     '''
 
     unique_key = 'doi'
@@ -115,9 +123,12 @@ class WebSearchProvider(object):
         search results to the callback. Each single search result is a 
         dictionary containing all the information that could be fetched from the
         webpage, e.g.:
-        [{'title': 'A paper title', 'authors': ['Author A', 'Author B']},
-         {'title': 'Another paper', 'authors': ['Author C'],
-          'import_url': 'http://example.com/paper.pdf'}]
+        ..
+        
+            [{'title': 'A paper title', 'authors': ['Author A', 'Author B']},
+             {'title': 'Another paper', 'authors': ['Author C'],
+              'import_url': 'http://example.com/paper.pdf'}]
+              
         In addition, each paper can also contain arbitrary additional data as the 
         value for a 'data' key. This could for example be used to save the full
         HTML code of a search result (which might be useful for an import of this
@@ -141,7 +152,7 @@ class WebSearchProvider(object):
         '''
         This method will be called by the GUI with the `search_string` when a
         search is initiated. Returns search results from the cache or initiates
-        a new search using :method:`search_async` if the search has not been
+        a new search using :meth:`search_async` if the search has not been
         performed before. Before calling the `callback`, saves the search
         results to the cache.
         
@@ -183,7 +194,7 @@ class WebSearchProvider(object):
         Will be called when the server returns a response. If the server
         returns an invalid response, the error callback is called. In case of 
         a valid response, the response will be parsed with
-        :method:`parse_respose` and the resulting list returned to the callback.
+        :meth`parse_respose` and the resulting list returned to the callback.
         '''
         if message.status_code == Soup.KnownStatusCode.OK:
             callback(self.parse_response(message.response_body.flatten().get_data()))
@@ -194,7 +205,7 @@ class WebSearchProvider(object):
         '''
         This method will be called if multiple `papers` are requested for import.
         In the default case, this imports one paper after the other calling
-        :method:`import_paper_after_search` for each individual paper (which in 
+        :meth:`import_paper_after_search` for each individual paper (which in 
         turn calls the the `callback` for each result).
         Some search providers allow downloading multiple papers in one bulk
         operation, such providers should overwrite this function.
@@ -269,7 +280,7 @@ class WebSearchProvider(object):
     # -------------------------------------------------------------------------
     def prepare_search_message(self, search_string):
         '''
-        If :method:`search_async` is not overwritten, this method should be
+        If :meth:`search_async` is not overwritten, this method should be
         overwritten to return a :class:`Soup.Message`, representing the query
         that should be send to the website. In many cases, this is as simple as
         ::
@@ -281,9 +292,9 @@ class WebSearchProvider(object):
 
     def parse_response(self, response):
         '''
-        In case :method:`handle_response_received` has not been overwritten,
+        In case :meth:`handle_response_received` has not been overwritten,
         this method will be called to parse a response (typically HTML or XML).
         It is expected to return a list of search results (see
-        :method:`search_async` for further details).  
+        :meth:`search_async` for further details).  
         '''
         raise NotImplementedError()
