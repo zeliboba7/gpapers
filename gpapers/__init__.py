@@ -76,7 +76,6 @@ BOOKMARK_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons',
 GRAPH_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons',
                                                          'drawing.png'))
 
-
 GObject.threads_init()
 
 
@@ -153,10 +152,12 @@ def import_documents_via_filenames(filenames, callback):
 
     main_gui.refresh_middle_pane_search()
 
+
 def row_from_dictionary(info, provider=None):
     assert info is not None
 
     return (VirtualPaper(info, provider), )
+
 
 def paper_from_dictionary(paper_info, paper=None):
     '''
@@ -213,6 +214,7 @@ def paper_from_dictionary(paper_info, paper=None):
     paper.save()
 
     return paper
+
 
 def compare_papers(column, row1, row2, user_data):
     '''
@@ -2457,7 +2459,6 @@ class OrganizationEditGUI:
         menu.show_all()
 
 
-
 class SourceEditGUI:
     def __init__(self, id):
         self.source = Source.objects.get(id=id)
@@ -2516,7 +2517,6 @@ class SourceEditGUI:
         menu.attach_to_widget(self.ui.get_object('source_edit_dialog'), None)
         menu.popup(None, None, None, None, 0, 0)
         menu.show_all()
-
 
 
 class ReferenceEditGUI:
@@ -2630,7 +2630,6 @@ class CitationEditGUI:
         except: self.reference.referenced_paper = None
         self.reference.save()
         self.edit_dialog.destroy()
-
 
 
 class PaperEditGUI:
@@ -2896,6 +2895,7 @@ class PaperEditGUI:
     def add_new_author(self, new_author):
         self.authors_model.append((new_author.id, new_author.name))
 
+
 def init_db():
     import django.core.management.commands.syncdb
     django.core.management.commands.syncdb.Command().handle_noargs(interactive=False)
@@ -2919,4 +2919,3 @@ def main(argv):
     main_gui = MainGUI()
     importer.active_threads = main_gui.active_threads
     Gtk.main()
-
