@@ -115,41 +115,4 @@ class ArxivSearch(SimpleWebSearchProvider):
         
         return papers
     
-    def import_paper_after_search(self, data, callback):
-        """
-        FIXME: Inconsistent signature for this function.
-        
-        gpapers.__init__:1702
-        button.connect('clicked',
-                               lambda x: paper.provider.import_paper_after_search(paper.data,
-                                                                                  self.document_imported))
-        
-        gpapers.importer.__init__:625
-        def import_paper_after_search(self, data, paper, callback)
-        
-        Nowehere appears to call the latter form, but it seems more sensible - 
-        otherwise I have to set paper['data'] = paper otherwise I don't seem to
-        be able to return appropriate info to the callback.
-        
-        I am not clear on the correct delegation of operations here - "import_url"
-        is already supplied by the initial search operation, but it appears
-        necessary to download it ourselves here or it doesn't get done.
-        
-        Note that arxiv returns 403 forbidden if no user-agent is set.
-        """
-        
-        if 'import_url' in data:
-            message = Soup.Message.new(method='GET', uri_string=data['import_url'])
-            
-            def mycallback(session, message, user_data):
-                if message.status_code == Soup.KnownStatusCode.OK:
-                    log_debug("arxiv: received pdf length %s" % message.response_body.length)
-                    callback(data, message.response_body.flatten().get_data(), user_data)
-                else:
-                    log_error("arxiv: got status %s while trying to fetch PDF" % (message.status_code))
-                    callback(data, None, user_data)
-            
-            log_debug("arxiv: trying to fetch %s" % data['import_url'])
-            soup_session.queue_message(message, mycallback, (self.label, data['arxiv_id']))
-        else:
-            callback(data, None, self.label)
+    

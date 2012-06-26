@@ -127,7 +127,7 @@ class GoogleScholarSearch(SimpleWebSearchProvider):
             paper_info = None
         callback(paper_info, None, user_data)
 
-    def import_paper_after_search(self, data, callback):
+    def import_paper_after_search(self, data, paper, callback):
         log_info('Trying to import google scholar citation')
         try:
             citations = data.findAll('div', {'class': 'gs_fl'})[0]
