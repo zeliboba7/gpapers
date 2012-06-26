@@ -23,7 +23,8 @@ import urllib
 from gi.repository import Soup
 import feedparser
 
-from gpapers.importer import SimpleWebSearchProvider, soup_session
+from gpapers.importer import soup_session
+from gpapers.importer.provider_base import WebSearchProvider
 from gpapers.logger import log_debug, log_error
 
 BASE_URL = 'http://export.arxiv.org/api/query?'
@@ -31,7 +32,7 @@ SORT_BY = "lastUpdatedDate"
 SORT_ORDER = "descending"
 MAX_RESULTS = 100
 
-class ArxivSearch(SimpleWebSearchProvider):
+class ArxivSearch(WebSearchProvider):
     """
     A search provider/importer for the arXiv.org e-print archive,
     covering physics, mathematics, computer science, etc.
