@@ -287,7 +287,7 @@ class VirtualSource(object):
 
 class VirtualPaper(object):
     ''' An object that can be treated for table display purposes as if it were
-    an already existing `Paper` object, i.e. it provides a title attribute etc.
+    an already existing :class:`Paper` object, i.e. it provides a title attribute etc.
     '''
 
     class VirtualSet(object):
