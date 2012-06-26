@@ -80,27 +80,11 @@ GRAPH_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR, 'icons',
 GObject.threads_init()
 
 
-def humanize_count(x, s, p, places=1):
-    output = []
-    if places == -1:
-        places = 0
-        print_x = False
-    else:
-        print_x = True
-    x = float(x) * math.pow(10, places)
-    x = round(x)
-    x = x / math.pow(10, places)
-    if x - int(x) == 0:
-        x = int(x)
-    if print_x: output.append(str(x))
-    if x == 1:
-        output.append(s)
-    else:
-        output.append(p)
-    return ' '.join(output)
-
-
 def truncate_long_str(s, max_length=96):
+    '''
+    Truncates a given string `s` at a certain length and adds an ellipsis if
+    necessary.
+    '''
     s = unicode(s)
     if len(s) < max_length:
         return s
@@ -324,7 +308,9 @@ def render_paper_document_attribute(column, cell, model, iter, widget):
 
 
 class MainGUI:
-
+    '''
+    The main application window.
+    '''
     active_threads = {}
 
     def bibtex_received(self, bibtex_data, doi):
@@ -416,7 +402,8 @@ class MainGUI:
     def import_url_dialog(self, o):
         '''
         Opens a dialog for entering an URL. For importing this URL,
-        ``import_citation`` is called in a new thread.
+        :meth:`importer.import_from_url`` is called,
+        notifying :meth:`document_imported` when the data has arrived.
         '''
         dialog = Gtk.MessageDialog(parent=self.main_window,
                                    type=Gtk.MessageType.QUESTION,
@@ -438,9 +425,9 @@ class MainGUI:
 
     def import_doi_dialog(self, o):
         '''
-        Opens a dialog for entering a DOI. For importing this document from the
-        http://dx.doi.org/... URL, ``import_citation`` is called in a new
-        thread.
+        Opens a dialog for entering a DOI. For importing the
+        ``http://dx.doi.org/...`` URL, :meth:`importer.import_from_url`` is
+        called, notifying :meth:`document_imported` when the data has arrived.
         '''
         dialog = Gtk.MessageDialog(parent=self.main_window,
                                    type=Gtk.MessageType.QUESTION,
@@ -464,7 +451,7 @@ class MainGUI:
     def import_file_dialog(self, o):
         '''
         Opens a dialog for chosing one or several files. If any files are 
-        chosen, ``import_documents_via_filenames`` is called in a new thread.
+        chosen, :func:`import_documents_via_filenames` is called.
         '''
         dialog = Gtk.FileChooserDialog(title='Select one or more files import…',
                                        parent=self.main_window,
@@ -493,7 +480,7 @@ class MainGUI:
     def import_directory_dialog(self, o):
         '''
         Opens a dialog for chosing a directory. If a directory is chosen,
-        ``import_documents_via_filenames`` is called in a new thread.
+        :func:`import_documents_via_filenames` is called.
         '''
         dialog = Gtk.FileChooserDialog(title='Select a directory to import…',
                                        parent=self.main_window,
@@ -521,9 +508,12 @@ class MainGUI:
 
     def import_bibtex_dialog(self, o):
         '''
-        Opens a dialog for entering/pasting BibTex information. For importing
-        the information, ``import_documents_via_bibtexs`` is called in a new
-        thread.
+        Opens a dialog for entering/pasting BibTex information. The given
+        information is first converted into a ``paper_info`` dictionary via
+        :func:`bibtex.paper_info_from_bibtex`. If the returned paper info
+        contains an URL or a DOI, :meth:`importer.import_from_url` is called
+        for this URL. In either case, :meth:`document_imported` is called in
+        the end.
         '''
         dialog = Gtk.MessageDialog(parent=self.main_window,
                                    type=Gtk.MessageType.QUESTION,
@@ -561,6 +551,9 @@ class MainGUI:
         dialog.destroy()
 
     def __init__(self):
+        '''
+        Initialize the main GUI.
+        '''
         self.search_providers = {'pubmed' : pubmed.PubMedSearch(),
                          'google_scholar' : google_scholar.GoogleScholarSearch(),
                          'jstor' : jstor.JSTORSearch(),
@@ -734,6 +727,7 @@ class MainGUI:
          * `playlist_id` is the id of the playlist in the database
          * `editable` is True only for Playlists (they can be renamed)
          * `source` is used for saved searches and the searches themselves
+         
         '''
         left_pane = self.ui.get_object('left_pane')
         # name, icon, playlist_id, editable, source
@@ -1948,9 +1942,6 @@ class MainGUI:
             toolbar_bookmarks.insert(button, -1)
 
 
-    def echo_objects(self, a=None, b=None, c=None, d=None, e=None, f=None, g=None):
-        print a, b, c, d, e, f, g
-
     # FIXME: only save after some time without changes
     def update_paper_notes(self, text_buffer, id):
         log_debug('update_paper_notes called for id %s' % str(id))
@@ -1968,10 +1959,14 @@ class MainGUI:
         bookmark.save()
 
     def delete_papers(self, paper_ids):
+        '''
+        Delete papers with the given `paper_ids`. Will first display a dialog
+        asking for confirmation.
+        '''
         papers = Paper.objects.in_bulk(paper_ids).values()
         paper_list_text = '\n'.join([ ('<i>"%s"</i>' % unicode(paper.title)) for paper in papers ])
         dialog = Gtk.MessageDialog(type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, flags=Gtk.DialogFlags.MODAL)
-        dialog.set_markup('Really delete the following %s?\n\n%s\n\n' % (humanize_count(len(papers), 'paper', 'papers', places= -1), paper_list_text))
+        dialog.set_markup('Really delete the following %d paper(s)?\n\n%s\n\n' % (len(papers), paper_list_text))
         dialog.set_default_response(Gtk.ResponseType.NO)
         dialog.show_all()
         response = dialog.run()
@@ -1983,6 +1978,10 @@ class MainGUI:
             self.refresh_middle_pane_search()
 
     def remove_papers_from_current_playlist(self, paper_ids):
+        '''
+        Delete papers with the given `paper_ids` from the currently selected
+        playlist.
+        '''
         if not self.current_playlist: return
         try:
             for paper in Paper.objects.in_bulk(paper_ids).values():
