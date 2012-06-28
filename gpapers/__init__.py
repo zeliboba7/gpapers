@@ -880,7 +880,7 @@ class MainGUI:
         column.set_sort_column_id(2)
         author_filter.append_column(column)
         make_all_columns_resizeable_clickable_ellipsize(author_filter.get_columns())
-        author_filter.get_selection().connect('changed', lambda x: thread.start_new_thread(self.refresh_middle_pane_from_my_library, (False,)))
+        author_filter.get_selection().connect('changed', lambda x: self.refresh_middle_pane_from_my_library(False))
         author_filter.connect('row-activated', self.handle_author_filter_row_activated)
         author_filter.connect('button-press-event', self.handle_author_filter_button_press_event)
 
@@ -900,7 +900,7 @@ class MainGUI:
         column.set_sort_column_id(3)
         organization_filter.append_column(column)
         make_all_columns_resizeable_clickable_ellipsize(organization_filter.get_columns())
-        organization_filter.get_selection().connect('changed', lambda x: thread.start_new_thread(self.refresh_middle_pane_from_my_library, (False,)))
+        organization_filter.get_selection().connect('changed', lambda x: self.refresh_middle_pane_from_my_library(False))
         organization_filter.connect('row-activated', self.handle_organization_filter_row_activated)
         organization_filter.connect('button-press-event', self.handle_organization_filter_button_press_event)
 
@@ -923,12 +923,18 @@ class MainGUI:
         column.set_sort_column_id(4)
         source_filter.append_column(column)
         make_all_columns_resizeable_clickable_ellipsize(source_filter.get_columns())
-        source_filter.get_selection().connect('changed', lambda x: thread.start_new_thread(self.refresh_middle_pane_from_my_library, (False,)))
+        source_filter.get_selection().connect('changed', lambda x: self.refresh_middle_pane_from_my_library(False))
         source_filter.connect('row-activated', self.handle_source_filter_row_activated)
         source_filter.connect('button-press-event', self.handle_source_filter_button_press_event)
 
     def refresh_my_library_filter_pane(self):
-
+        # clear all selections for now
+        # TODO: Handle all additions/removals to the models more gracefully,
+        # i.e. add and remove objects from the existing model instead of clearing
+        # and filling it up again on every refresh
+        self.ui.get_object('author_filter').get_selection().unselect_all()
+        self.ui.get_object('source_filter').get_selection().unselect_all()
+        self.ui.get_object('organization_filter').get_selection().unselect_all()
         self.author_filter_model.clear()
         for author in Author.objects.order_by('name'):
             self.author_filter_model.append((author.id, author.name, author.paper_set.count()))
@@ -2004,7 +2010,7 @@ class MainGUI:
             for paper in Paper.objects.in_bulk(paper_ids).values():
                 self.current_playlist.papers.remove(paper)
             self.current_playlist.save()
-            thread.start_new_thread(self.refresh_middle_pane_from_my_library, (False,))
+            self.refresh_middle_pane_from_my_library(True)
         except:
             traceback.print_exc()
 
