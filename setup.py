@@ -23,6 +23,7 @@ import os
 from distutils.core import setup
 from distutils.command.build_scripts import build_scripts as build_scripts_class
 
+from gpapers import __version__
 
 class gpapers_build_scripts_class(build_scripts_class):
     # Adjust bin/gpapers.py --> gpapers
@@ -39,18 +40,28 @@ class gpapers_build_scripts_class(build_scripts_class):
                     print 'renaming %s to %s' % (file, file_no_ext)
                     os.rename(file, file_no_ext)
 
+dependencies = ['gi.repository.Gtk',
+                'gi.repository.GdkPixbuf',
+                'gi.repository.Pango',
+                'gi.repository.Poppler',
+                'django',
+                'gi.repository.Soup'
+                'BeautifulSoup',
+                'feedparser',
+                'pdfminer'] 
+
 setup(name='gPapers',
       cmdclass={'build_scripts': gpapers_build_scripts_class},
-      version='0.5dev',
+      version=__version__,
       description='The Gnome-based Scientific Paper Organizer',
-      author='Derek Anderson',
-      author_email='public@kered.org',
+      author='Derek Anderson <public@kered.org>, Marcel Stimberg <marcelcoding@googlemail.com>',
+      author_email='gpapers-discuss@googlegroups.com',
       url='http://gpapers.org/',
       packages=['gpapers', 'gpapers.gPapers', 'gpapers.importer'],
       package_data={'gpapers': ['data/*', 'icons/*']},
       data_files=[('share/applications', ['xdg/gpapers.desktop'])],
       scripts=['gpapers.py'],
-       classifiers=[
+      classifiers=[
           'Development Status :: 3 - Alpha',
           'Environment :: X11 Applications :: GTK',
           'Intended Audience :: End Users/Desktop',
@@ -60,4 +71,5 @@ setup(name='gPapers',
           'Programming Language :: Python',
           'Topic :: Utilities'
           ],
+      requires=dependencies
      )
