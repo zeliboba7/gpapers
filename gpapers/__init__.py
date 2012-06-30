@@ -32,6 +32,7 @@ import time
 import traceback
 
 from gi.repository import Gio
+from gi.repository import GLib
 from gi.repository import GObject
 from gi.repository import Gdk
 from gi.repository import Gtk
@@ -2930,6 +2931,18 @@ def main(argv):
     '''
     Gtk.init(argv)
     MEDIA_ROOT = gpapers.settings.MEDIA_ROOT
+
+    # check for a directory from a previous version and move it to the new place
+    if not os.path.exists(MEDIA_ROOT):
+        log_info('Directory %s does not exist.' % MEDIA_ROOT)
+        old_paths = [os.path.join(GLib.get_user_data_dir(), '.gPapers'), 
+                     os.path.join(os.path.expanduser('~'), '.gPapers-test')]
+        for old_path in old_paths:
+            if os.path.exists(old_path):
+                log_info('Found old data dir "%s", moving to "%s"' %
+                         (old_path, MEDIA_ROOT))
+                os.rename(old_path, MEDIA_ROOT)
+                break
 
     log_info('using database at %s' % MEDIA_ROOT)
 

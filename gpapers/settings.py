@@ -4,7 +4,7 @@ import os
 from gi.repository import GLib
 
 # use user data dir according to XDG specification
-DATA_DIR = os.path.join(GLib.get_user_data_dir(), '.gPapers')
+DATA_DIR = os.path.join(GLib.get_user_data_dir(), 'gPapers')
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
