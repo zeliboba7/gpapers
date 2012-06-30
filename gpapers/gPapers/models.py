@@ -282,6 +282,7 @@ class VirtualSource(object):
 
     def __init__(self):
         self.name = None
+        self.issue = None
         self.publication_date = VirtualSource.SimpleDate()
 
 
@@ -308,6 +309,7 @@ class VirtualPaper(object):
         self.provider = provider  # The origin of this search result
         self.authors = []
         self.source = VirtualSource()
+        self.source_pages = None
         self.full_text = None
         self.abstract = None
         self.title = None
