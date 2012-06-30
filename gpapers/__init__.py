@@ -676,7 +676,10 @@ class MainGUI:
             search_text=self.ui.get_object('middle_pane_search').get_text(),
             parent=self.search_providers[liststore[row][4]].label
         )
-        if created: playlist.save()
+        if created:
+            playlist.save()
+        log_debug('Saved smart search "%s" for provider "%s"' % (playlist.search_text,
+                                                                 playlist.parent))
         self.refresh_left_pane()
 
     def create_playlist(self, ids=None):
@@ -747,8 +750,9 @@ class MainGUI:
         column.pack_start(renderer, True)
         column.add_attribute(renderer, 'markup', 0)
         column.add_attribute(renderer, 'editable', 3)
-
-        self.ui.get_object('left_pane_selection').connect('changed', self.select_left_pane_item)
+        left_pane_selection = self.ui.get_object('left_pane_selection')
+        self.left_pane_selection_handler_id = left_pane_selection.connect('changed',
+                                                                          self.select_left_pane_item)
         left_pane.connect('button-press-event', self.handle_left_pane_button_press_event)
 
         left_pane.enable_model_drag_dest([LEFT_PANE_ADD_TO_PLAYLIST_DND_ACTION], Gdk.DragAction.COPY)
@@ -1029,6 +1033,10 @@ class MainGUI:
             self.select_left_pane_item(self.ui.get_object('left_pane_selection'))
 
     def refresh_left_pane(self):
+        log_debug('Refreshing left pane...')
+        # avoid searches while rebuilding the pane
+        self.ui.get_object('left_pane_selection').handler_block(self.left_pane_selection_handler_id)
+        
         # FIXME: These should not be loaded again and again
         NEVER_READ_ICON = GdkPixbuf.Pixbuf.new_from_file(os.path.join(BASE_DIR,
                                                                       'icons',
@@ -1072,19 +1080,22 @@ class MainGUI:
             icon_fname = os.path.join(BASE_DIR, 'icons', provider.icon)
             provider_icon = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_fname,
                                                                    16, 16) #FIXME            
-            self.left_pane_model.append(None, (provider.name,
-                             provider_icon, -1, False, provider.label))
+            treeiter = self.left_pane_model.append(None, (provider.name,
+                                                          provider_icon, -1,
+                                                          False,
+                                                          provider.label))
             for playlist in Playlist.objects.filter(parent=provider.label):
-                print 'paylist item', playlist
                 icon = left_pane.render_icon(Gtk.STOCK_FIND, Gtk.IconSize.MENU)
-                self.left_pane_model.append(self.left_pane_model.get_iter((1),),
+                self.left_pane_model.append(treeiter,
                                             (playlist.title, icon, playlist.id,
                                              True, provider.label))
 
         left_pane.expand_all()
+        log_debug('...Refreshing left pane done.')
+        self.ui.get_object('left_pane_selection').handler_unblock(self.left_pane_selection_handler_id)
         self.ui.get_object('left_pane_selection').select_path((0,))
 
-    def select_left_pane_item(self, selection):
+    def select_left_pane_item(self, selection):   
         liststore, row = selection.get_selected()
         left_pane_toolbar = self.ui.get_object('left_pane_toolbar')
         for child in left_pane_toolbar.get_children():
