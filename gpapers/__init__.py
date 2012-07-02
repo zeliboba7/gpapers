@@ -2930,10 +2930,8 @@ class PaperEditGUI:
 
 
 def init_db():
-    import django.core.management.commands.syncdb
-    django.core.management.commands.syncdb.Command().handle_noargs(interactive=False,
-                                                                   verbosity=0,
-                                                                   database='default')
+    from django.core import management
+    management.call_command('syncdb', verbosity=0, interactive=False)
 
 
 def main(argv):
