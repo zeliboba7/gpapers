@@ -15,6 +15,15 @@ ADMINS = (
 
 MANAGERS = ADMINS
 
+# For django 1.4
+DATABASES = { 'default':
+	{
+	'ENGINE' : 'django.db.backends.sqlite3',
+	'NAME' : os.path.join(DATA_DIR, 'papers_db.sqlite3')
+	}
+}
+
+# For django 1.3
 DATABASE_ENGINE = 'sqlite3'           # 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
 DATABASE_NAME = os.path.join(DATA_DIR, 'papers_db.sqlite3')             # Or path to database file if using sqlite3.
 DATABASE_USER = ''             # Not used with sqlite3.
