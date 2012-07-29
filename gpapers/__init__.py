@@ -270,6 +270,8 @@ def get_paper_text_attribute(paper, attribute):
         else:
             pub_year = ''
         return pub_year
+    elif attribute == 'Created':
+        return paper.created.strftime('%x')
     else:
         # Get the value of the respective attribute
         return unicode(getattr(paper, attribute.lower()))
