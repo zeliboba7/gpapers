@@ -23,7 +23,7 @@ import os
 from distutils.core import setup
 from distutils.command.build_scripts import build_scripts as build_scripts_class
 
-from gpapers import __version__
+from gpapers_info import (__version__, __authors__, __description__, __url__)
 
 class gpapers_build_scripts_class(build_scripts_class):
     # Adjust bin/gpapers.py --> gpapers
@@ -53,11 +53,12 @@ dependencies = ['gi.repository.Gtk',
 setup(name='gPapers',
       cmdclass={'build_scripts': gpapers_build_scripts_class},
       version=__version__,
-      description='The Gnome-based Scientific Paper Organizer',
-      author='Derek Anderson <public@kered.org>, Marcel Stimberg <marcelcoding@googlemail.com>',
+      description=__description__,
+      author=', '.join(__authors__),
       author_email='gpapers-discuss@googlegroups.com',
-      url='http://gpapers.org/',
+      url=__url__,
       packages=['gpapers', 'gpapers.gPapers', 'gpapers.importer'],
+      py_modules=['gpapers_info'],
       package_data={'gpapers': ['data/*', 'icons/*']},
       data_files=[('share/applications', ['xdg/gpapers.desktop'])],
       scripts=['gpapers.py'],
