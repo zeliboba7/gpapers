@@ -20,8 +20,6 @@
 #    You should have received a copy of the GNU General Public License
 #    along with gPapers.  If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = '0.5dev'
-
 from datetime import datetime, timedelta, date
 import math
 import mimetypes
@@ -55,6 +53,8 @@ from gpapers.gPapers.models import *
 import gpapers.importer as importer
 from gpapers.importer import pango_escape
 from gpapers.importer import pubmed, google_scholar, jstor, arxiv
+from gpapers_info import (__version__, __authors__, __url__,
+                          __description__, __copyright__)
 
 log_level_debug()
 
@@ -654,12 +654,11 @@ class MainGUI:
         about = Gtk.AboutDialog()
         about.set_program_name('gPapers')
         about.set_version(__version__)
-        about.set_copyright('Copyright (c) 2008, 2009 Derek Anderson; 2012 Derek Anderson & Marcel Stimberg')
-        about.set_comments('''The Gnome-based Scientific Paper Organizer''')
+        about.set_copyright(__copyright__)
+        about.set_comments(__description__)
         about.set_license_type(Gtk.License.GPL_3_0)
-        about.set_website('http://gpapers.org/')
-        about.set_authors(['Derek Anderson <public@kered.org>',
-                           'Marcel Stimberg'])
+        about.set_website(__url__)
+        about.set_authors(__authors__)
         about.connect('response', lambda x, y: about.destroy())
         about.show()
 
