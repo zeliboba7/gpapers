@@ -142,16 +142,17 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
     callback is called with the `paper_info` (a dictionary) and `paper_data`
     (binary data) as an argument.
     '''
+    
+    active_threads[url] = 'Importing %s' % url
 
-    importer.active_threads[url] = 'Importing %s' % url
-
-    def data_received(session, message, user_data):
+    def data_received(session, message, user_data):        
+        
         if not message.status_code == Soup.KnownStatusCode.OK:
             # FIXME: Use error handler here
             log_warn('URL %s responded with error code %d' % (user_data,
                                                               message.status_code))
-            if url in importer.active_threads: 
-                del importer.active_threads[url]
+            if url in active_threads: 
+                del active_threads[url]
             callback(user_data=user_data)
             return
 
@@ -173,12 +174,12 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
                                                            message.get_uri()))
 
         if content_type == 'application/pdf':
-            if url in importer.active_threads: 
-                del importer.active_threads[url]
+            if url in active_threads: 
+                del active_threads[url]
             callback(paper_info=paper_info, paper_data=data, user_data=user_data)
         elif (content_type == 'text/x-bibtex' or first_letter == '@') and not paper_info:
-            if url in importer.active_threads: 
-                del importer.active_threads[url]
+            if url in active_threads: 
+                del active_threads[url]
             callback(paper_info=bibtex.paper_info_from_bibtex(data),
                      paper_data=paper_data, user_data=user_data)
         elif content_type == 'text/html':
@@ -221,19 +222,19 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
                 #Combine the base URL with the PDF link (necessary for relative URLs)
                 urls = [urlparse.urljoin(orig_url, url) for url in urls]
                 log_debug('Calling import_from_urls with %s' % str(urls))
-                if url in importer.active_threads: 
-                    del importer.active_threads[url]
+                if url in active_threads: 
+                    del active_threads[url]
                 import_from_urls(urls, callback, user_data)
             else:
                 log_warn('Nothing found...')
-                if url in importer.active_threads: 
-                    del importer.active_threads[url]
+                if url in active_threads: 
+                    del active_threads[url]
                 callback(paper_info=paper_info, paper_data=paper_data,
                          user_data=user_data)
         else:
             log_warn('Do not know what to do with content type %s of URL %s' % (content_type, orig_url))
-            if url in importer.active_threads: 
-                del importer.active_threads[url]
+            if url in active_threads: 
+                del active_threads[url]
             callback(paper_info=paper_info, paper_data=paper_data, user_data=user_data)
 
     try:
@@ -247,8 +248,8 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
         soup_session.queue_message(message, data_received, url)
         log_debug('Message queued')
     else:
-        if url in importer.active_threads: 
-            del importer.active_threads[url]
+        if url in active_threads: 
+            del active_threads[url]
         callback(paper_info, paper_data, url)
 
 
@@ -280,7 +281,7 @@ def _import_from_urls(urls, callback, user_data, paper_info=None, paper_data=Non
         log_debug('Received content type %s for URI %s' % (content_type,
                                                            message.get_uri()))
 
-        if content_type == 'application/pdf' and not paper_data:
+        if content_type.startswith('application/pdf') and not paper_data:
             _import_from_urls(urls, callback, user_data, paper_info=paper_info,
                               paper_data=data)
         elif (content_type == 'text/x-bibtex' or first_letter == '@') and not paper_info:

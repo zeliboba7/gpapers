@@ -24,7 +24,7 @@ from gi.repository import Soup
 
 from gpapers.logger import log_info, log_debug
 from gpapers.importer import soup_session
-
+from gpapers.importer import active_threads
 
 class WebSearchProvider(object):
     '''
