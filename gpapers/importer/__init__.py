@@ -142,11 +142,10 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
     callback is called with the `paper_info` (a dictionary) and `paper_data`
     (binary data) as an argument.
     '''
-    
+
     active_threads[url] = 'Importing %s' % url
 
-    def data_received(session, message, user_data):        
-        
+    def data_received(session, message, user_data):
         if not message.status_code == Soup.KnownStatusCode.OK:
             # FIXME: Use error handler here
             log_warn('URL %s responded with error code %d' % (user_data,
@@ -164,7 +163,7 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
 
         if message.response_body.data:
             data = message.response_body.flatten().get_data()
-            # Heuristic: BibTeX data starts with a @            
+            # Heuristic: BibTeX data starts with a @
             first_letter = data.strip()[0]
         else:
             first_letter = None
@@ -224,7 +223,8 @@ def import_from_url(url, callback, paper_info=None, paper_data=None):
                 log_debug('Calling import_from_urls with %s' % str(urls))
                 if url in active_threads: 
                     del active_threads[url]
-                import_from_urls(urls, callback, user_data)
+                import_from_urls(urls, callback, user_data,
+                                 paper_info=paper_info, paper_data=paper_data)
             else:
                 log_warn('Nothing found...')
                 if url in active_threads: 
@@ -261,7 +261,7 @@ def _import_from_urls(urls, callback, user_data, paper_info=None, paper_data=Non
     called with the `paper_info` (a dictionary) and `paper_data` (binary data)
     as an argument.
     '''
-    log_debug('_import_from_urls')
+    log_debug('_import_from_urls, paper_info: %s' % str(paper_info))
     if not urls or (paper_info and paper_data):
         callback(paper_info, paper_data, user_data)
         return
@@ -273,7 +273,6 @@ def _import_from_urls(urls, callback, user_data, paper_info=None, paper_data=Non
         if message.response_body.data:
             # Heuristic: BibTeX data starts with a @
             first_letter = message.response_body.data.strip()[0]
-            log_debug('First letter of Body is: %s' % first_letter)
             data = message.response_body.flatten().get_data()
         else:
             first_letter = None
@@ -297,7 +296,7 @@ def _import_from_urls(urls, callback, user_data, paper_info=None, paper_data=Non
     soup_session.queue_message(message, data_received, user_data)
 
 
-def import_from_urls(urls, callback, user_data):
+def import_from_urls(urls, callback, user_data, paper_info=None, paper_data=None):
     '''
     Searches the given urls (asynchronously) for a PDF and/or metadata
     (currently it will only look for BibTeX data). When either all URLs have
@@ -306,7 +305,8 @@ def import_from_urls(urls, callback, user_data):
     as an argument.
     '''
     if urls is None:
-        callback(user_data=user_data)
+        callback(paper_info=paper_info, paper_data=paper_data,
+                 user_data=user_data)
 
     log_info(('Starting to look for PDF and/or metadata '
              'from %d possible URLs' % len(urls)))
@@ -316,4 +316,5 @@ def import_from_urls(urls, callback, user_data):
         callback(paper_info=paper_info, paper_data=paper_data,
                  user_data=user_data)
 
-    _import_from_urls(urls, _import_from_urls_finished, user_data)
+    _import_from_urls(urls, _import_from_urls_finished, user_data,
+                      paper_info=paper_info, paper_data=paper_data)

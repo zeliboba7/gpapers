@@ -348,40 +348,35 @@ class MainGUI:
             # FIXME: This should be handled via an error callback
             return
 
+        if paper_info is None:
+            paper_info = {}
+
         if paper_obj is not None:
             # This is a paper imported after a search, merge its info with 
             # any additional info in paper_info (overwriting infos in the
             # paper object info -- e.g. google search gives very imprecise
             # results for a search but the BibTeX contains more accurate
             # info)
-            if paper_info is None:
-                paper_info = {}            
-            
             for key in paper_obj.paper_info:
                 if not key in paper_info:
                         paper_info[key] = paper_obj.paper_info[key]
 
-        if paper_data is not None:
-            
+        if paper_data is not None:            
             # Get some info from the PDF:
             self.active_threads[str(user_data)] = 'Extracting data from PDF'
+            # FIXME: This extraction should be done asynchronously
             paper_info_pdf = pdf_file.get_paper_info_from_pdf(paper_data)
             del self.active_threads[str(user_data)]
             
-            log_debug('in document_imported: paper_info is %s' % paper_info)
-            # Add everything that is not already known
-            if paper_info is None:
-                paper_info = paper_info_pdf
-                # If we get a DOI, download the metadata
-                need_paper_info = True
-            else:
-                need_paper_info = False
-                for key in paper_info_pdf.keys():
-                    if not key in paper_info:
-                        paper_info[key] = paper_info_pdf[key]
+            # The info directly taken from the PDF is generally not very good,
+            # overwrite conflicting info with any additionally given info
+            paper_info_pdf.update(paper_info)            
+            paper_info = paper_info_pdf
+            
+        paper = paper_from_dictionary(paper_info)
 
-            paper = paper_from_dictionary(paper_info)
-
+        # If we have a PDF file, save the file
+        if paper_data is not None:
             #TODO: What is a good filename? Make this configurable?
             if paper.doi:
                 filename = 'doi_' + paper.doi
@@ -394,12 +389,11 @@ class MainGUI:
             log_debug('Saving paper to "%s"' % filename)
             paper.save_file(filename, paper_data)
             log_debug('Paper saved')
-            if need_paper_info and paper.doi:
-                log_debug('Downloading metadata')
-                importer.get_bibtex_for_doi(paper.doi, self.bibtex_received)
-        else:
-            log_debug('Calling paper_from_dictionary for %s' % str(paper_info))
-            paper = paper_from_dictionary(paper_info)
+        
+        # If we have a DOI, try to get bibtex metadata for the paper
+        if paper.doi:
+            log_debug('Downloading metadata for doi %s' % str(paper.doi))
+            importer.get_bibtex_for_doi(paper.doi, self.bibtex_received)
 
         paper.save()
 
@@ -447,8 +441,12 @@ class MainGUI:
         dialog.show_all()
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            url = 'http://dx.doi.org/' + entry.get_text().strip()
-            importer.import_from_url(url, self.document_imported)
+            doi = entry.get_text().strip()
+            url = 'http://dx.doi.org/' + doi
+            # Already set the DOI, useful for downloading full metadata
+            paper_info = dict(doi=doi)
+            importer.import_from_url(url, self.document_imported,
+                                     paper_info=paper_info)
 
         dialog.destroy()
 
