@@ -116,7 +116,7 @@ def make_all_columns_resizeable_clickable_ellipsize(columns):
         #column.connect('clicked', self.sortRows)
         for renderer in column.get_cells():
             if renderer.__class__.__name__ == 'CellRendererText':
-                renderer.set_property('ellipsize', Pango.EllipsizeMode.MIDDLE)
+                renderer.set_property('ellipsize', Pango.EllipsizeMode.END)
 
 
 def import_documents_via_filenames(filenames, callback):
@@ -1190,28 +1190,40 @@ class MainGUI:
         column.set_sort_column_id(0)
         self.middle_top_pane_model.set_sort_func(0, compare_papers, 'Title')
                           
-        middle_top_pane.append_column(column)        
+        middle_top_pane.append_column(column)
+        columns = {}        
         for c_idx, attribute in enumerate(['Authors', 'Journal', 'Year',
                                            'Created']):
-            column = Gtk.TreeViewColumn(attribute)            
+            columns[attribute] = Gtk.TreeViewColumn(attribute)            
             renderer = Gtk.CellRendererText()
-            column.pack_start(renderer, True)
-            column.set_cell_data_func(renderer, render_paper_text_attribute,
-                                      attribute)
+            columns[attribute].pack_start(renderer, True)
+            columns[attribute].set_cell_data_func(renderer,
+                                                  render_paper_text_attribute,
+                                                  attribute)
             # We fake some column indices here that do actually not correspond
             # to column indices in the model (the model has only one column
             # containing the paper object). We use a custom sort function to
             # make the sorting work
-            column.set_sort_column_id(c_idx + 1)
+            columns[attribute].set_sort_column_id(c_idx + 1)
             self.middle_top_pane_model.set_sort_func(c_idx + 1, compare_papers,
                                                      attribute)
-            if attribute == 'Authors':
-                # only authors and title column should expand
-                column.set_expand(True)
-            middle_top_pane.append_column(column)
+        
+            middle_top_pane.append_column(columns[attribute])
 
         make_all_columns_resizeable_clickable_ellipsize(middle_top_pane.get_columns())
 
+        # For authors, the last author is often an interesting information and
+        # many journal names have similar beginnings ("Journal of...", etc. --
+        # ellipsizing in the middle therefore makes more sense
+        for attribute in ['Authors', 'Journal']:
+            for renderer in columns[attribute].get_cells():
+                if renderer.__class__.__name__ == 'CellRendererText':
+                    renderer.set_property('ellipsize',
+                                          Pango.EllipsizeMode.MIDDLE)
+        
+        # only authors and title column should expand        
+        columns['Authors'].set_expand(True)
+        
         middle_top_pane.connect('row-activated', self.handle_middle_top_pane_row_activated)
         middle_top_pane.get_selection().connect('changed', self.select_middle_top_pane_item)
         middle_top_pane.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK,
