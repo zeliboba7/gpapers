@@ -1176,22 +1176,22 @@ class MainGUI:
         middle_top_pane.connect('button-press-event',
                                 self.handle_middle_top_pane_button_press_event)
 
-        column = Gtk.TreeViewColumn()
-        column.set_title('Title')
-        column.set_expand(True)
+        columns = {} 
+        columns['Title'] = Gtk.TreeViewColumn()
+        columns['Title'].set_title('Title')
         renderer = Gtk.CellRendererPixbuf()
-        column.set_cell_data_func(renderer, render_paper_document_attribute,
+        columns['Title'].set_cell_data_func(renderer, render_paper_document_attribute,
                                   middle_top_pane)
-        column.pack_start(renderer, False)
+        columns['Title'].pack_start(renderer, False)
         renderer = Gtk.CellRendererText()
-        column.pack_start(renderer, True)
-        column.set_cell_data_func(renderer, render_paper_text_attribute, 
+        columns['Title'].pack_start(renderer, True)
+        columns['Title'].set_cell_data_func(renderer, render_paper_text_attribute, 
                                   'Title')
-        column.set_sort_column_id(0)
+        columns['Title'].set_sort_column_id(0)
         self.middle_top_pane_model.set_sort_func(0, compare_papers, 'Title')
                           
-        middle_top_pane.append_column(column)
-        columns = {}        
+        middle_top_pane.append_column(columns['Title'])
+               
         for c_idx, attribute in enumerate(['Authors', 'Journal', 'Year',
                                            'Created']):
             columns[attribute] = Gtk.TreeViewColumn(attribute)            
@@ -1221,7 +1221,14 @@ class MainGUI:
                     renderer.set_property('ellipsize',
                                           Pango.EllipsizeMode.MIDDLE)
         
-        # only authors and title column should expand        
+        # ellipsizing the "created" date does not look nice, and authors and
+        # title should have some reasonable minimum width
+        columns['Created'].set_property('min-width', 80)
+        columns['Title'].set_property('min-width', 200)
+        columns['Authors'].set_property('min-width', 200)
+        
+        # only authors and title column should expand
+        columns['Title'].set_expand(True)        
         columns['Authors'].set_expand(True)
         
         middle_top_pane.connect('row-activated', self.handle_middle_top_pane_row_activated)
