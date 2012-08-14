@@ -524,32 +524,41 @@ class MainGUI:
         #dialog.connect('response', lambda x,y: dialog.destroy())
         dialog.set_markup('<b>Import BibTex...</b>\n\nEnter the BibTex entry (or entries) you would like to import:')
         entry = Gtk.TextView()
+        entry.set_wrap_mode(Gtk.WrapMode.WORD)
         scrolledwindow = Gtk.ScrolledWindow()
         scrolledwindow.add(entry)
         scrolledwindow.set_property('height-request', 300)
         dialog.vbox.add(scrolledwindow)
-        dialog.set_default_response(Gtk.ResponseType.OK)
-        dialog.show_all()
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-
-            text_buffer = entry.get_buffer()
-            bibtex_data = text_buffer.get_text(text_buffer.get_start_iter(),
-                                          text_buffer.get_end_iter(), False)
-            paper_info = bibtex.paper_info_from_bibtex(bibtex_data)
-
-            url = paper_info.get('import_url')
-            if not url:
-                url = paper_info.get('doi')
-                if url:
-                    url = 'http://dx.doi.org/' + url
-
-            if url:
-                importer.import_from_url(url, self.document_imported,
-                                         paper_info=paper_info)
-            else:
-                self.document_imported(paper_info=paper_info)
-
+        statuslabel = Gtk.Label()
+        dialog.vbox.add(statuslabel)
+        dialog.set_default_response(Gtk.ResponseType.OK)        
+        dialog.show_all()        
+        done = False
+        while not done:
+            response = dialog.run()
+            if response == Gtk.ResponseType.OK:    
+                text_buffer = entry.get_buffer()
+                bibtex_data = text_buffer.get_text(text_buffer.get_start_iter(),
+                                              text_buffer.get_end_iter(), False)
+                paper_info = bibtex.paper_info_from_bibtex(bibtex_data)
+                if len(paper_info):
+                    url = paper_info.get('import_url')
+                    if not url:
+                        url = paper_info.get('doi')
+                        if url:
+                            url = 'http://dx.doi.org/' + url
+        
+                    if url:
+                        importer.import_from_url(url, self.document_imported,
+                                                 paper_info=paper_info)
+                    else:
+                        self.document_imported(paper_info=paper_info)
+                    done = True
+                else:
+                    statuslabel.set_markup('<span foreground="red" font-style="italic">Could not parse BibTeX.</span>')
+            else: # cancel button pressed
+                done = True
+            
         dialog.destroy()
 
     def __init__(self):
