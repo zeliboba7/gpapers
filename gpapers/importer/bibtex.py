@@ -33,7 +33,7 @@
 #  Matthew Brett 2010
 #  Simplified BSD license
 
-from gpapers.logger import log_info, log_debug
+from gpapers.logger import log_warn, log_info, log_debug
 
 from pyparsing import (Regex, Suppress, ZeroOrMore, Group, Optional, Forward,
                        SkipTo, CaselessLiteral, Dict)
@@ -127,16 +127,12 @@ preamble = AT + CaselessLiteral('preamble') + bracketed(field_value)
 macro_contents = macro_def + EQUALS + field_value
 macro = AT + CaselessLiteral('string') + bracketed(macro_contents)
 
-# Implicit comments
-icomment = SkipTo('@').setParseAction(lambda t : t.insert(0, 'icomment'))
-
 # entries are last in the list (other than the fallback) because they have
 # arbitrary start patterns that would match comments, preamble or macro
 definitions = Group(comment |
                     preamble |
                     macro |
-                    entry |
-                    icomment)
+                    entry)
 
 # Start symbol
 bibfile = ZeroOrMore(definitions)
@@ -166,6 +162,10 @@ def paper_info_from_bibtex(data):
     paper_info = {}
 
     result = parse_str(data)
+    if len(result) == 0:
+        log_warn('Could not parse BibTeX data')
+        return {}
+    
     bibtex = {}
     # FIXME: This does not handle special cases well...
     for i, r in enumerate(result[0][2:]):
@@ -191,7 +191,8 @@ def paper_info_from_bibtex(data):
     for bibtex_key, our_key in mappings.items():
         if bibtex_key in bibtex:
             log_debug('Have key %s' % bibtex_key)
-            paper_info[our_key] = bibtex[bibtex_key]
+            # replace newlines with spaces and remove superfluous spaces
+            paper_info[our_key] = bibtex[bibtex_key].replace('\n', ' ').strip()
 
     # TODO: Handle editors, etc.?
     if 'author' in bibtex:
