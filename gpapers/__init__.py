@@ -572,7 +572,7 @@ class MainGUI:
         self.ui = Gtk.Builder()
         self.ui.add_from_file(os.path.join(BASE_DIR, 'data', 'ui.xml'))
         self.main_window = self.ui.get_object('main_window')
-        self.main_window.connect("delete-event", lambda x, y: sys.exit(0))
+        self.main_window.connect("delete-event", lambda x, y: self.cleanup_and_quit())
         self.init_menu()
         # Save content of last search to avoid generating too many
         # search events
@@ -598,6 +598,26 @@ class MainGUI:
 
         self.main_window.maximize()
         self.main_window.show()
+
+    def cleanup_and_quit(self):
+        ''' 
+        Called when the program ends. Takes care of saving unsaved notes and
+        bookmarks.
+        '''
+        log_info('Quitting program...')
+        if (not self.pdf_preview.displayed_paper is None and
+            self.pdf_preview.notes_edited):
+            log_info('Saving displayed paper (changed notes)')
+            post_save.receivers = []
+            self.pdf_preview.displayed_paper.save()
+        
+        if (not self.pdf_preview.displayed_bookmark is None and
+            self.pdf_preview.bookmark_edited):
+            log_info('Saving displayed bookmarked (unsaved changes)')
+            self.pdf_preview.displayed_bookmark.save()
+        
+        # really quit
+        Gtk.main_quit()
 
     def init_busy_notifier(self):
         busy_notifier = self.ui.get_object('busy_notifier')
