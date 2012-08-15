@@ -569,7 +569,6 @@ class MainGUI:
                          'google_scholar' : google_scholar.GoogleScholarSearch(),
                          'jstor' : jstor.JSTORSearch(),
                          'arxiv' : arxiv.ArxivSearch()}
-        self.displayed_paper = None
         self.ui = Gtk.Builder()
         self.ui.add_from_file(os.path.join(BASE_DIR, 'data', 'ui.xml'))
         self.main_window = self.ui.get_object('main_window')
@@ -587,8 +586,7 @@ class MainGUI:
         self.init_middle_top_pane()
         self.init_paper_information_pane()
         self.init_busy_notifier()
-        self.init_bookmark_pane()
-        self.init_pdf_preview_pane()
+        self.pdf_preview = PDFPreview(self.ui)
         self.refresh_left_pane()
 
         # make sure the GUI updates on database changes
@@ -766,117 +764,6 @@ class MainGUI:
         left_pane.connect('drag-data-received', self.handle_left_pane_drag_data_received_event)
         left_pane.connect("drag-motion", self.handle_left_pane_drag_motion_event)
 
-    def init_pdf_preview_pane(self):
-        pdf_preview = self.ui.get_object('pdf_preview')
-        self.pdf_preview = {}
-        self.pdf_preview['scale'] = None
-        pdf_preview.connect("draw", self.on_draw_pdf_preview)
-        pdf_preview.connect("button-press-event", self.handle_pdf_preview_button_press_event)
-
-        # drag and drop stuff for notes
-        pdf_preview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK,
-                                    [Gtk.TargetEntry.new(*PDF_PREVIEW_MOVE_NOTE_DND_ACTION)],
-                                    Gdk.DragAction.MOVE)
-        pdf_preview.drag_source_set_icon_pixbuf(NOTE_ICON)
-        pdf_preview.drag_dest_set(Gtk.DestDefaults.ALL,
-                                  [Gtk.TargetEntry.new(*PDF_PREVIEW_MOVE_NOTE_DND_ACTION)],
-                                  Gdk.DragAction.MOVE)
-        pdf_preview.connect('drag-drop', self.handle_pdf_preview_drag_drop_event)
-
-        self.ui.get_object('button_move_previous_page').connect('clicked', lambda x: self.goto_pdf_page(self.pdf_preview['current_page_number'] - 1))
-        self.ui.get_object('button_move_next_page').connect('clicked', lambda x: self.goto_pdf_page(self.pdf_preview['current_page_number'] + 1))
-        self.ui.get_object('button_zoom_in').connect('clicked', lambda x: self.zoom_pdf_page(-1.2))
-        self.ui.get_object('button_zoom_out').connect('clicked', lambda x: self.zoom_pdf_page(-.8))
-        self.ui.get_object('button_zoom_normal').connect('clicked', lambda x: self.zoom_pdf_page(1))
-        self.ui.get_object('button_zoom_best_fit').connect('clicked', lambda x: self.zoom_pdf_page(None))
-
-    def refresh_pdf_preview_pane(self):
-        pdf_preview = self.ui.get_object('pdf_preview')
-        if self.displayed_paper and self.displayed_paper.full_text and os.path.isfile(self.displayed_paper.full_text.path):
-            self.pdf_preview['document'] = Poppler.Document.new_from_file ('file://' + self.displayed_paper.full_text.path, None)
-            self.pdf_preview['n_pages'] = self.pdf_preview['document'].get_n_pages()
-            self.pdf_preview['scale'] = None
-            self.goto_pdf_page(self.pdf_preview['current_page_number'], new_doc=True)
-        else:
-            pdf_preview.set_size_request(0, 0)
-            self.pdf_preview['current_page'] = None
-            self.ui.get_object('button_move_previous_page').set_sensitive(False)
-            self.ui.get_object('button_move_next_page').set_sensitive(False)
-            self.ui.get_object('button_zoom_out').set_sensitive(False)
-            self.ui.get_object('button_zoom_in').set_sensitive(False)
-            self.ui.get_object('button_zoom_normal').set_sensitive(False)
-            self.ui.get_object('button_zoom_best_fit').set_sensitive(False)
-        pdf_preview.queue_draw()
-
-    def goto_pdf_page(self, page_number, new_doc=False):
-        if self.displayed_paper:
-            if not new_doc and self.pdf_preview.get('current_page') and self.pdf_preview['current_page_number'] == page_number:
-                return
-            if page_number < 0: page_number = 0
-            pdf_preview = self.ui.get_object('pdf_preview')
-            self.pdf_preview['current_page_number'] = page_number
-            self.pdf_preview['current_page'] = self.pdf_preview['document'].get_page(self.pdf_preview['current_page_number'])
-            if self.pdf_preview['current_page']:
-                self.pdf_preview['width'], self.pdf_preview['height'] = self.pdf_preview['current_page'].get_size()
-                self.ui.get_object('button_move_previous_page').set_sensitive(page_number > 0)
-                self.ui.get_object('button_move_next_page').set_sensitive(page_number < self.pdf_preview['n_pages'] - 1)
-                self.zoom_pdf_page(self.pdf_preview['scale'], redraw=False)
-            else:
-                self.ui.get_object('button_move_previous_page').set_sensitive(False)
-                self.ui.get_object('button_move_next_page').set_sensitive(False)
-            pdf_preview.queue_draw()
-        else:
-            self.ui.get_object('button_move_previous_page').set_sensitive(False)
-            self.ui.get_object('button_move_next_page').set_sensitive(False)
-
-    def zoom_pdf_page(self, scale, redraw=True):
-        """None==auto-size, negative means relative, positive means fixed"""
-        if self.displayed_paper:
-            if redraw and self.pdf_preview.get('current_page') and self.pdf_preview['scale'] == scale:
-                return
-            pdf_preview = self.ui.get_object('pdf_preview')
-            auto_scale = (pdf_preview.get_parent().get_allocation().width - 2.0) / self.pdf_preview['width']
-            if scale == None:
-                scale = auto_scale
-            else:
-                if scale < 0:
-                    if self.pdf_preview['scale'] == None: self.pdf_preview['scale'] = auto_scale
-                    scale = self.pdf_preview['scale'] = self.pdf_preview['scale'] * -scale
-                else:
-                    self.pdf_preview['scale'] = scale
-            pdf_preview.set_size_request(int(self.pdf_preview['width'] * scale), int(self.pdf_preview['height'] * scale))
-            self.ui.get_object('button_zoom_out').set_sensitive(scale > 0.3)
-            self.ui.get_object('button_zoom_in').set_sensitive(True)
-            self.ui.get_object('button_zoom_normal').set_sensitive(True)
-            self.ui.get_object('button_zoom_best_fit').set_sensitive(True)
-            if redraw: pdf_preview.queue_draw()
-            return scale
-        else:
-            pass
-
-    def on_draw_pdf_preview(self, widget, event):
-        if not self.displayed_paper or not self.pdf_preview.get('current_page'): return
-        cr = widget.get_window().cairo_create()
-        cr.set_source_rgb(1, 1, 1)
-        scale = self.pdf_preview['scale']
-        if scale == None:
-            scale = (self.ui.get_object('pdf_preview').get_parent().get_allocation().width - 2.0) / self.pdf_preview['width']
-        if scale != 1:
-            cr.scale(scale, scale)
-        cr.rectangle(0, 0, self.pdf_preview['width'], self.pdf_preview['height'])
-        cr.fill()
-        self.pdf_preview['current_page'].render(cr)
-        if self.pdf_preview.get('current_page_number') != None:
-            for bookmark in Bookmark.objects.filter(paper=self.displayed_paper, page=self.pdf_preview.get('current_page_number')):
-                x_pos = int(bookmark.x * widget.get_allocated_width())
-                y_pos = int(bookmark.y * widget.get_allocated_height())
-                if bookmark.notes:
-                    Gdk.cairo_set_source_pixbuf(cr, NOTE_ICON, x_pos, y_pos)
-                else:
-                    Gdk.cairo_set_source_pixbuf(cr, BOOKMARK_ICON, x_pos, y_pos)
-                cr.paint()
-
-
     def init_my_library_filter_pane(self):
 
         author_filter = self.ui.get_object('author_filter')
@@ -965,36 +852,6 @@ class MainGUI:
                                              source.issue, source.location,
                                              source.publisher,
                                              publication_date))
-
-
-    def init_bookmark_pane(self):
-        treeview_bookmarks = self.ui.get_object('treeview_bookmarks')
-        # id, page, title, updated, words
-        self.treeview_bookmarks_model = Gtk.ListStore(int, int, str, str, int)
-        treeview_bookmarks.set_model(self.treeview_bookmarks_model)
-        column = Gtk.TreeViewColumn("Page", Gtk.CellRendererText(), markup=1)
-        column.set_sort_column_id(1)
-        treeview_bookmarks.append_column(column)
-        column = Gtk.TreeViewColumn("Title", Gtk.CellRendererText(), markup=2)
-        column.set_expand(True)
-        column.set_sort_column_id(2)
-        treeview_bookmarks.append_column(column)
-        column = Gtk.TreeViewColumn("Words", Gtk.CellRendererText(), markup=4)
-        column.set_sort_column_id(4)
-        treeview_bookmarks.append_column(column)
-        column = Gtk.TreeViewColumn("Updated", Gtk.CellRendererText(), markup=3)
-        column.set_min_width(75)
-        column.set_sort_column_id(3)
-        treeview_bookmarks.append_column(column)
-        make_all_columns_resizeable_clickable_ellipsize(treeview_bookmarks.get_columns())
-        treeview_bookmarks.connect('button-press-event', self.handle_treeview_bookmarks_button_press_event)
-
-        treeview_bookmarks.get_selection().connect('changed', self.select_bookmark_pane_item)
-
-    def save_bookmark_page(self, bookmark_id, page):
-        bookmark = Bookmark.objects.get(id=bookmark_id)
-        bookmark.page = page
-        bookmark.save()
 
     def init_paper_information_pane(self):
         paper_notes = self.ui.get_object('paper_notes')
@@ -1306,91 +1163,6 @@ class MainGUI:
                     menu.popup(None, None, None, None, event.button, event.get_time())
             return True
 
-    def handle_pdf_preview_button_press_event(self, pdf_preview, event):
-        x = int(event.x)
-        y = int(event.y)
-        x_percent = 1.0 * x / pdf_preview.get_allocated_width()
-        y_percent = 1.0 * y / pdf_preview.get_allocated_height()
-        #print 'x, y, x_percent, y_percent, time', x, y, x_percent, y_percent, time
-
-        # are we clicking on a bookmark?
-        current_page_number = self.pdf_preview.get('current_page_number')
-        self.current_bookmark = bookmark = None
-        if self.displayed_paper and current_page_number >= 0:
-            for b in self.displayed_paper.bookmark_set.filter(paper=self.displayed_paper, page=current_page_number):
-                x_delta = x - b.x * pdf_preview.get_allocated_width()
-                y_delta = y - b.y * pdf_preview.get_allocated_height()
-                if x_delta > 0 and x_delta < 16:
-                    if y_delta > 0 and y_delta < 16:
-                        self.current_bookmark = bookmark = b
-
-        if event.button == 1 and bookmark:
-            self.select_bookmark_pane_item(None, bookmark_id=bookmark.id)
-            if bookmark.notes:
-                pdf_preview.drag_source_set_icon_pixbuf(NOTE_ICON)
-            else:
-                pdf_preview.drag_source_set_icon_pixbuf(BOOKMARK_ICON)
-
-        if event.button == 3:
-            if self.displayed_paper and current_page_number >= 0:
-                menu = Gtk.Menu()
-                if bookmark:
-                    if bookmark.page > 0:
-                        menuitem = Gtk.MenuItem('Move to previous page')
-                        menuitem.connect('activate', lambda x, i: self.move_bookmark(bookmark, page=i), bookmark.page - 1)
-                        menu.append(menuitem)
-                    if bookmark.page < self.pdf_preview['n_pages'] - 1:
-                        menuitem = Gtk.MenuItem('Move to next page')
-                        menuitem.connect('activate', lambda x, i: self.move_bookmark(bookmark, page=i), bookmark.page + 1)
-                        menu.append(menuitem)
-                    if self.pdf_preview['n_pages'] > 1:
-                        menuitem = Gtk.MenuItem('Move to page')
-                        submenu = Gtk.Menu()
-                        for i in range(0, self.pdf_preview['n_pages']):
-                            submenu_item = Gtk.MenuItem(str(i + 1))
-                            submenu_item.connect('activate', lambda x, i: self.move_bookmark(bookmark, i), i)
-                            submenu.append(submenu_item)
-                        menuitem.set_submenu(submenu)
-                        menu.append(menuitem)
-                    delete = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_DELETE, None)
-                    delete.connect('activate', lambda x: self.delete_bookmark(bookmark.id))
-                    menu.append(delete)
-                else:
-                    add = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ADD, None)
-                    add.connect('activate', lambda x: self.add_bookmark(self.displayed_paper, current_page_number, x_percent, y_percent))
-                    menu.append(add)
-                menu.show_all()
-                menu.attach_to_widget(pdf_preview, None)
-                menu.popup(None, None, None, None, event.button, event.get_time())
-
-        return bookmark == None # return true if bookmark not defined, to block DND events
-
-    def handle_pdf_preview_drag_drop_event(self, o1, o2, x, y, o3):
-        if self.current_bookmark:
-            pdf_preview = self.ui.get_object('pdf_preview')
-            x_percent = 1.0 * x / pdf_preview.get_allocated_width()
-            y_percent = 1.0 * y / pdf_preview.get_allocated_height()
-            self.current_bookmark.x = x_percent
-            self.current_bookmark.y = y_percent
-            self.current_bookmark.save()
-
-    def add_bookmark(self, paper, page, x, y):
-        bookmark = Bookmark.objects.create(paper=paper, page=page, x=x, y=y)
-        bookmark.save()
-        self.update_bookmark_pane_from_paper(self.displayed_paper)
-        self.select_bookmark_pane_item(None, bookmark_id=bookmark.id)
-
-    def move_bookmark(self, bookmark, page=None, x=None, y=None):
-        if bookmark:
-            if page != None:
-                bookmark.page = page
-            if x != None:
-                bookmark.x = x
-            if y != None:
-                bookmark.y = y
-            bookmark.save()
-            self.update_bookmark_pane_from_paper(self.displayed_paper)
-
     def handle_middle_top_pane_button_press_event(self, treeview, event):
         if event.button == 3:
             x = int(event.x)
@@ -1471,26 +1243,6 @@ class MainGUI:
                     menu.append(edit)
                     delete = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_DELETE, None)
                     delete.connect('activate', lambda x: self.delete_source(id))
-                    menu.append(delete)
-                    menu.show_all()
-                    menu.attach_to_widget(treeview, None)
-                    menu.popup(None, None, None, None, event.button, event.get_time())
-            return True
-
-    def handle_treeview_bookmarks_button_press_event(self, treeview, event):
-        if event.button == 3:
-            x = int(event.x)
-            y = int(event.y)
-            pthinfo = treeview.get_path_at_pos(x, y)
-            if pthinfo is not None:
-                path, col, cellx, celly = pthinfo
-                treeview.grab_focus()
-                treeview.set_cursor(path, col, 0)
-                id = self.treeview_bookmarks_model.get_value(self.treeview_bookmarks_model.get_iter(path), 0)
-                if id >= 0: #len(path)==2:
-                    menu = Gtk.Menu()
-                    delete = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_DELETE, None)
-                    delete.connect('activate', lambda x: self.delete_bookmark(id))
                     menu.append(delete)
                     menu.show_all()
                     menu.attach_to_widget(treeview, None)
@@ -1642,13 +1394,12 @@ class MainGUI:
         paper_information_toolbar = self.ui.get_object('paper_information_toolbar')
         for child in paper_information_toolbar.get_children():
             paper_information_toolbar.remove(child)
-        self.displayed_paper = None
 
         if not rows or len(rows) == 0:
-            self.update_bookmark_pane_from_paper(None)
+            self.pdf_preview.update_bookmark_pane_from_paper(None)
         elif len(rows) == 1:
             # a single selected paper
-            self.displayed_paper = paper = liststore[rows[0]][0]
+            paper = liststore[rows[0]][0]
             if paper.title:
                 self.paper_information_pane_model.append(('<b>Title:</b>',
                                                           paper.title ,))
@@ -1749,7 +1500,7 @@ class MainGUI:
                         importable_citations.add(citations[i])
                     self.paper_information_pane_model.append((col1, '<i>' + str(i + 1) + ':</i> ' + pango_escape(citations[i].line_from_referenced_paper)))
 
-                self.update_bookmark_pane_from_paper(self.displayed_paper)
+                self.pdf_preview.update_bookmark_pane_from_paper(paper)
 
                 button = Gtk.ToolButton(stock_id=Gtk.STOCK_EDIT)
                 button.set_tooltip_text('Edit this paper...')
@@ -1806,7 +1557,7 @@ class MainGUI:
 
         else:
             # more than one paper
-            self.update_bookmark_pane_from_paper(None)
+            self.pdf_preview.update_bookmark_pane_from_paper(None)
             self.paper_information_pane_model.append(('<b>Number of papers:</b>', str(len(rows)) ,))
 
             papers = []
@@ -1855,9 +1606,8 @@ class MainGUI:
                 button.connect('clicked', lambda x: self.graph_papers_and_authors(selected_valid_paper_ids))
                 paper_information_toolbar.insert(button, -1)
 
-
-        self.pdf_preview['current_page_number'] = 0
-        self.refresh_pdf_preview_pane()
+        self.pdf_preview.pdf_preview['current_page_number'] = 0
+        self.pdf_preview.refresh_pdf_preview_pane()
 
         paper_information_toolbar.show_all()
 
@@ -1934,90 +1684,6 @@ class MainGUI:
         time.sleep(.1)
         Gtk.show_uri(None, 'file://' + file, Gdk.CURRENT_TIME)
 
-    def update_bookmark_pane_from_paper(self, paper):
-        toolbar_bookmarks = self.ui.get_object('toolbar_bookmarks')
-        for child in toolbar_bookmarks.get_children():
-            toolbar_bookmarks.remove(child)
-        self.treeview_bookmarks_model.clear()
-        if paper:
-            for bookmark in paper.bookmark_set.order_by('page'):
-                try: title = str(bookmark.notes).split('\n')[0]
-                except: title = str(bookmark.notes)
-                self.treeview_bookmarks_model.append((bookmark.id, bookmark.page + 1, title, bookmark.updated.strftime(DATE_FORMAT), len(str(bookmark.notes).split())))
-        self.refresh_pdf_preview_pane()
-        self.select_bookmark_pane_item()
-
-    def select_bookmark_pane_item(self, selection=None, bookmark_id=None):
-        if selection == None:
-            selection = self.ui.get_object('treeview_bookmarks').get_selection()
-        toolbar_bookmarks = self.ui.get_object('toolbar_bookmarks')
-        for child in toolbar_bookmarks.get_children():
-            toolbar_bookmarks.remove(child)
-
-        if bookmark_id != None:
-            selection.unselect_all()
-            # we're being asked to select a specific row, not handle a selection event
-            for i in range(0, len(self.treeview_bookmarks_model)):
-                if self.treeview_bookmarks_model[i][0] == bookmark_id:
-                    selection.select_path((i,))
-                    return
-
-        try: selected_bookmark_id = self.treeview_bookmarks_model.get_value(self.ui.get_object('treeview_bookmarks').get_selection().get_selected()[1], 0)
-        except: selected_bookmark_id = -1
-
-        paper_notes = self.ui.get_object('paper_notes')
-        try:
-            if not self.update_paper_notes_handler_id == None:
-                paper_notes.get_buffer().disconnect(self.update_paper_notes_handler_id)
-            self.update_paper_notes_handler_id = None
-        except:
-            self.update_paper_notes_handler_id = None
-
-        if selected_bookmark_id != -1:
-                bookmark = Bookmark.objects.get(id=selected_bookmark_id)
-                paper_notes.get_buffer().set_text(bookmark.notes)
-                paper_notes.set_property('sensitive', True)
-                self.goto_pdf_page(bookmark.page)
-                self.update_paper_notes_handler_id = paper_notes.get_buffer().connect('changed', self.update_bookmark_notes, selected_bookmark_id)
-        elif self.displayed_paper:
-                paper_notes.get_buffer().set_text(self.displayed_paper.notes)
-                paper_notes.set_property('sensitive', True)
-                self.update_paper_notes_handler_id = paper_notes.get_buffer().connect('changed', self.update_paper_notes, self.displayed_paper.id)
-        else:
-            paper_notes.get_buffer().set_text('')
-            paper_notes.set_property('sensitive', False)
-
-
-        if self.displayed_paper:
-            button = Gtk.ToolButton(stock_id=Gtk.STOCK_ADD)
-            button.set_tooltip_text('Add a new page note...')
-            button.connect('clicked', lambda x, paper: Bookmark.objects.create(paper=paper, page=self.pdf_preview['current_page_number']).save() or self.update_bookmark_pane_from_paper(self.displayed_paper), self.displayed_paper)
-            button.show()
-            toolbar_bookmarks.insert(button, -1)
-
-        if selected_bookmark_id != -1:
-            button = Gtk.ToolButton(stock_id=Gtk.STOCK_DELETE)
-            button.set_tooltip_text('Delete this page note...')
-            button.connect('clicked', lambda x: self.delete_bookmark(selected_bookmark_id))
-            button.show()
-            toolbar_bookmarks.insert(button, -1)
-
-
-    # FIXME: only save after some time without changes
-    def update_paper_notes(self, text_buffer, id):
-        log_debug('update_paper_notes called for id %s' % str(id))
-        paper = Paper.objects.get(id=id)
-        paper.notes = text_buffer.get_text(text_buffer.get_start_iter(),
-                                           text_buffer.get_end_iter(), False)
-        paper.save()
-
-    # FIXME: only save after some time without changes
-    def update_bookmark_notes(self, text_buffer, id):
-        log_debug('update_bookmark_notes called for id %s' % str(id))
-        bookmark = Bookmark.objects.get(id=id)
-        bookmark.notes = text_buffer.get_text(text_buffer.get_start_iter(),
-                                              text_buffer.get_end_iter(), False)
-        bookmark.save()
 
     def delete_papers(self, paper_ids):
         '''
@@ -2052,7 +1718,8 @@ class MainGUI:
         except:
             traceback.print_exc()
 
-    def delete_object(self, text, obj, update_function):
+    @staticmethod
+    def delete_object(text, obj, update_function):
         '''
         Asks for confirmation before deleting an object and calling an update
         function (e.g. :meth:`refresh_left_pane`). Is called by the
@@ -2075,7 +1742,7 @@ class MainGUI:
         Ask for confirmation before deleting a document collection (playlist).
         '''
         obj = Playlist.objects.get(id=id)
-        self.delete_object('Really delete this document collection?', obj,
+        MainGUI.delete_object('Really delete this document collection?', obj,
                            self.refresh_left_pane)
 
     def delete_author(self, id):
@@ -2083,23 +1750,15 @@ class MainGUI:
         Ask for confirmation before deleting an author.
         '''
         obj = Author.objects.get(id=id)
-        self.delete_object('Really delete this author?', obj,
+        MainGUI.delete_object('Really delete this author?', obj,
                            self.refresh_my_library_filter_pane())
-
-    def delete_bookmark(self, id):
-        '''
-        Ask for confirmation before deleting a bookmark.
-        '''
-        obj = Bookmark.objects.get(id=id)
-        self.delete_object('Really delete this bookmark?', obj,
-                           lambda : self.update_bookmark_pane_from_paper(self.displayed_paper))
 
     def delete_source(self, id):
         '''
         Ask for confirmation before deleting a source (e.g. a journal)
         '''
         obj = Source.objects.get(id=id)
-        self.delete_object('Really delete this source?', obj,
+        MainGUI.delete_object('Really delete this source?', obj,
                            self.refresh_my_library_filter_pane)
 
     def delete_organization(self, id):
@@ -2107,7 +1766,7 @@ class MainGUI:
         Ask for confirmation before deleting an organization.
         '''
         obj = Organization.objects.get(id=id)
-        self.delete_object('Really delete this organization?', obj,
+        MainGUI.delete_object('Really delete this organization?', obj,
                            self.refresh_my_library_filter_pane)
 
     def refresh_middle_pane_from_my_library(self, refresh_library_filter_pane=True):
@@ -2296,6 +1955,393 @@ class MainGUI:
         self.middle_top_pane_model.clear()
         for row in rows:
             self.middle_top_pane_model.append(row)
+
+class PDFPreview(object):
+    '''
+    Class representing the PDF preview pane and the corresponding notes and
+    bookmarks
+    '''
+    
+    def __init__(self, ui):
+        '''
+        Initialize the PDF preview, bookmarks and notes. Pass a reference to
+        the main UI glade object.
+        ''' 
+        self.ui = ui
+        self.displayed_paper = None
+        self.displayed_bookmark = None
+        self.notes_edited = False
+        self.bookmark_edited = False
+        self.init_pdf_preview_pane()
+        self.init_bookmark_pane()
+        
+    ###########################################################################
+    # PDF preview
+    ###########################################################################
+    
+    def init_pdf_preview_pane(self):
+        pdf_preview = self.ui.get_object('pdf_preview')
+        self.pdf_preview = {}
+        self.pdf_preview['scale'] = None
+        pdf_preview.connect("draw", self.on_draw_pdf_preview)
+        pdf_preview.connect("button-press-event", self.handle_pdf_preview_button_press_event)
+
+        # drag and drop stuff for notes
+        pdf_preview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK,
+                                    [Gtk.TargetEntry.new(*PDF_PREVIEW_MOVE_NOTE_DND_ACTION)],
+                                    Gdk.DragAction.MOVE)
+        pdf_preview.drag_source_set_icon_pixbuf(NOTE_ICON)
+        pdf_preview.drag_dest_set(Gtk.DestDefaults.ALL,
+                                  [Gtk.TargetEntry.new(*PDF_PREVIEW_MOVE_NOTE_DND_ACTION)],
+                                  Gdk.DragAction.MOVE)
+        pdf_preview.connect('drag-drop', self.handle_pdf_preview_drag_drop_event)
+
+        self.ui.get_object('button_move_previous_page').connect('clicked', lambda x: self.goto_pdf_page(self.pdf_preview['current_page_number'] - 1))
+        self.ui.get_object('button_move_next_page').connect('clicked', lambda x: self.goto_pdf_page(self.pdf_preview['current_page_number'] + 1))
+        self.ui.get_object('button_zoom_in').connect('clicked', lambda x: self.zoom_pdf_page(-1.2))
+        self.ui.get_object('button_zoom_out').connect('clicked', lambda x: self.zoom_pdf_page(-.8))
+        self.ui.get_object('button_zoom_normal').connect('clicked', lambda x: self.zoom_pdf_page(1))
+        self.ui.get_object('button_zoom_best_fit').connect('clicked', lambda x: self.zoom_pdf_page(None))
+
+    def refresh_pdf_preview_pane(self):
+        pdf_preview = self.ui.get_object('pdf_preview')
+        if self.displayed_paper and self.displayed_paper.full_text and os.path.isfile(self.displayed_paper.full_text.path):
+            self.pdf_preview['document'] = Poppler.Document.new_from_file ('file://' + self.displayed_paper.full_text.path, None)
+            self.pdf_preview['n_pages'] = self.pdf_preview['document'].get_n_pages()
+            self.pdf_preview['scale'] = None
+            self.goto_pdf_page(self.pdf_preview['current_page_number'], new_doc=True)
+        else:
+            pdf_preview.set_size_request(0, 0)
+            self.pdf_preview['current_page'] = None
+            self.ui.get_object('button_move_previous_page').set_sensitive(False)
+            self.ui.get_object('button_move_next_page').set_sensitive(False)
+            self.ui.get_object('button_zoom_out').set_sensitive(False)
+            self.ui.get_object('button_zoom_in').set_sensitive(False)
+            self.ui.get_object('button_zoom_normal').set_sensitive(False)
+            self.ui.get_object('button_zoom_best_fit').set_sensitive(False)
+        pdf_preview.queue_draw()
+
+    def goto_pdf_page(self, page_number, new_doc=False):
+        if self.displayed_paper:
+            if not new_doc and self.pdf_preview.get('current_page') and self.pdf_preview['current_page_number'] == page_number:
+                return
+            if page_number < 0: page_number = 0
+            pdf_preview = self.ui.get_object('pdf_preview')
+            self.pdf_preview['current_page_number'] = page_number
+            self.pdf_preview['current_page'] = self.pdf_preview['document'].get_page(self.pdf_preview['current_page_number'])
+            if self.pdf_preview['current_page']:
+                self.pdf_preview['width'], self.pdf_preview['height'] = self.pdf_preview['current_page'].get_size()
+                self.ui.get_object('button_move_previous_page').set_sensitive(page_number > 0)
+                self.ui.get_object('button_move_next_page').set_sensitive(page_number < self.pdf_preview['n_pages'] - 1)
+                self.zoom_pdf_page(self.pdf_preview['scale'], redraw=False)
+            else:
+                self.ui.get_object('button_move_previous_page').set_sensitive(False)
+                self.ui.get_object('button_move_next_page').set_sensitive(False)
+            pdf_preview.queue_draw()
+        else:
+            self.ui.get_object('button_move_previous_page').set_sensitive(False)
+            self.ui.get_object('button_move_next_page').set_sensitive(False)
+
+    def zoom_pdf_page(self, scale, redraw=True):
+        """None==auto-size, negative means relative, positive means fixed"""
+        if self.displayed_paper:
+            if redraw and self.pdf_preview.get('current_page') and self.pdf_preview['scale'] == scale:
+                return
+            pdf_preview = self.ui.get_object('pdf_preview')
+            auto_scale = (pdf_preview.get_parent().get_allocation().width - 2.0) / self.pdf_preview['width']
+            if scale == None:
+                scale = auto_scale
+            else:
+                if scale < 0:
+                    if self.pdf_preview['scale'] == None: self.pdf_preview['scale'] = auto_scale
+                    scale = self.pdf_preview['scale'] = self.pdf_preview['scale'] * -scale
+                else:
+                    self.pdf_preview['scale'] = scale
+            pdf_preview.set_size_request(int(self.pdf_preview['width'] * scale), int(self.pdf_preview['height'] * scale))
+            self.ui.get_object('button_zoom_out').set_sensitive(scale > 0.3)
+            self.ui.get_object('button_zoom_in').set_sensitive(True)
+            self.ui.get_object('button_zoom_normal').set_sensitive(True)
+            self.ui.get_object('button_zoom_best_fit').set_sensitive(True)
+            if redraw: pdf_preview.queue_draw()
+            return scale
+        else:
+            pass
+
+    def on_draw_pdf_preview(self, widget, event):
+        if not self.displayed_paper or not self.pdf_preview.get('current_page'): return
+        cr = widget.get_window().cairo_create()
+        cr.set_source_rgb(1, 1, 1)
+        scale = self.pdf_preview['scale']
+        if scale == None:
+            scale = (self.ui.get_object('pdf_preview').get_parent().get_allocation().width - 2.0) / self.pdf_preview['width']
+        if scale != 1:
+            cr.scale(scale, scale)
+        cr.rectangle(0, 0, self.pdf_preview['width'], self.pdf_preview['height'])
+        cr.fill()
+        self.pdf_preview['current_page'].render(cr)
+        if self.pdf_preview.get('current_page_number') != None:
+            for bookmark in Bookmark.objects.filter(paper=self.displayed_paper, page=self.pdf_preview.get('current_page_number')):
+                x_pos = int(bookmark.x * widget.get_allocated_width())
+                y_pos = int(bookmark.y * widget.get_allocated_height())
+                if bookmark.notes:
+                    Gdk.cairo_set_source_pixbuf(cr, NOTE_ICON, x_pos, y_pos)
+                else:
+                    Gdk.cairo_set_source_pixbuf(cr, BOOKMARK_ICON, x_pos, y_pos)
+                cr.paint()
+
+    def handle_pdf_preview_button_press_event(self, pdf_preview, event):
+        x = int(event.x)
+        y = int(event.y)
+        x_percent = 1.0 * x / pdf_preview.get_allocated_width()
+        y_percent = 1.0 * y / pdf_preview.get_allocated_height()
+        #print 'x, y, x_percent, y_percent, time', x, y, x_percent, y_percent, time
+
+        # are we clicking on a bookmark?
+        current_page_number = self.pdf_preview.get('current_page_number')
+        self.current_bookmark = bookmark = None
+        if self.displayed_paper and current_page_number >= 0:
+            for b in self.displayed_paper.bookmark_set.filter(paper=self.displayed_paper, page=current_page_number):
+                x_delta = x - b.x * pdf_preview.get_allocated_width()
+                y_delta = y - b.y * pdf_preview.get_allocated_height()
+                if x_delta > 0 and x_delta < 16:
+                    if y_delta > 0 and y_delta < 16:
+                        self.current_bookmark = bookmark = b
+
+        if event.button == 1 and bookmark:
+            self.select_bookmark_pane_item(None, bookmark_id=bookmark.id)
+            if bookmark.notes:
+                pdf_preview.drag_source_set_icon_pixbuf(NOTE_ICON)
+            else:
+                pdf_preview.drag_source_set_icon_pixbuf(BOOKMARK_ICON)
+
+        if event.button == 3:
+            if self.displayed_paper and current_page_number >= 0:
+                menu = Gtk.Menu()
+                if bookmark:
+                    if bookmark.page > 0:
+                        menuitem = Gtk.MenuItem('Move to previous page')
+                        menuitem.connect('activate', lambda x, i: self.move_bookmark(bookmark, page=i), bookmark.page - 1)
+                        menu.append(menuitem)
+                    if bookmark.page < self.pdf_preview['n_pages'] - 1:
+                        menuitem = Gtk.MenuItem('Move to next page')
+                        menuitem.connect('activate', lambda x, i: self.move_bookmark(bookmark, page=i), bookmark.page + 1)
+                        menu.append(menuitem)
+                    if self.pdf_preview['n_pages'] > 1:
+                        menuitem = Gtk.MenuItem('Move to page')
+                        submenu = Gtk.Menu()
+                        for i in range(0, self.pdf_preview['n_pages']):
+                            submenu_item = Gtk.MenuItem(str(i + 1))
+                            submenu_item.connect('activate', lambda x, i: self.move_bookmark(bookmark, i), i)
+                            submenu.append(submenu_item)
+                        menuitem.set_submenu(submenu)
+                        menu.append(menuitem)
+                    delete = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_DELETE, None)
+                    delete.connect('activate', lambda x: self.delete_bookmark(bookmark.id))
+                    menu.append(delete)
+                else:
+                    add = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ADD, None)
+                    add.connect('activate', lambda x: self.add_bookmark(self.displayed_paper, current_page_number, x_percent, y_percent))
+                    menu.append(add)
+                menu.show_all()
+                menu.attach_to_widget(pdf_preview, None)
+                menu.popup(None, None, None, None, event.button, event.get_time())
+
+        return bookmark == None # return true if bookmark not defined, to block DND events
+
+    def handle_pdf_preview_drag_drop_event(self, o1, o2, x, y, o3):
+        if self.current_bookmark:
+            pdf_preview = self.ui.get_object('pdf_preview')
+            x_percent = 1.0 * x / pdf_preview.get_allocated_width()
+            y_percent = 1.0 * y / pdf_preview.get_allocated_height()
+            self.current_bookmark.x = x_percent
+            self.current_bookmark.y = y_percent
+            self.current_bookmark.save()
+
+    ###########################################################################
+    # Bookmarks
+    ###########################################################################
+    def init_bookmark_pane(self):
+        treeview_bookmarks = self.ui.get_object('treeview_bookmarks')
+        # id, page, title, updated, words
+        self.treeview_bookmarks_model = Gtk.ListStore(int, int, str, str, int)
+        treeview_bookmarks.set_model(self.treeview_bookmarks_model)
+        column = Gtk.TreeViewColumn("Page", Gtk.CellRendererText(), markup=1)
+        column.set_sort_column_id(1)
+        treeview_bookmarks.append_column(column)
+        column = Gtk.TreeViewColumn("Title", Gtk.CellRendererText(), markup=2)
+        column.set_expand(True)
+        column.set_sort_column_id(2)
+        treeview_bookmarks.append_column(column)
+        column = Gtk.TreeViewColumn("Words", Gtk.CellRendererText(), markup=4)
+        column.set_sort_column_id(4)
+        treeview_bookmarks.append_column(column)
+        column = Gtk.TreeViewColumn("Updated", Gtk.CellRendererText(), markup=3)
+        column.set_min_width(75)
+        column.set_sort_column_id(3)
+        treeview_bookmarks.append_column(column)
+        make_all_columns_resizeable_clickable_ellipsize(treeview_bookmarks.get_columns())
+        treeview_bookmarks.connect('button-press-event', self.handle_treeview_bookmarks_button_press_event)
+
+        treeview_bookmarks.get_selection().connect('changed', self.select_bookmark_pane_item)
+
+    def save_bookmark_page(self, bookmark_id, page):
+        bookmark = Bookmark.objects.get(id=bookmark_id)
+        bookmark.page = page
+        bookmark.save()
+
+    def add_bookmark(self, paper, page, x, y):
+        bookmark = Bookmark.objects.create(paper=paper, page=page, x=x, y=y)
+        bookmark.save()
+        self.update_bookmark_pane_from_paper(self.displayed_paper)
+        self.select_bookmark_pane_item(None, bookmark_id=bookmark.id)
+
+    def delete_bookmark(self, id):
+        '''
+        Ask for confirmation before deleting a bookmark.
+        '''
+        obj = Bookmark.objects.get(id=id)
+        MainGUI.delete_object('Really delete this bookmark?', obj,
+                              lambda : self.update_bookmark_pane_from_paper(self.displayed_paper))
+
+    def move_bookmark(self, bookmark, page=None, x=None, y=None):
+        if bookmark:
+            if page != None:
+                bookmark.page = page
+            if x != None:
+                bookmark.x = x
+            if y != None:
+                bookmark.y = y
+            bookmark.save()
+            self.update_bookmark_pane_from_paper(self.displayed_paper)
+
+    def handle_treeview_bookmarks_button_press_event(self, treeview, event):
+        if event.button == 3:
+            x = int(event.x)
+            y = int(event.y)
+            pthinfo = treeview.get_path_at_pos(x, y)
+            if pthinfo is not None:
+                path, col, cellx, celly = pthinfo
+                treeview.grab_focus()
+                treeview.set_cursor(path, col, 0)
+                id = self.treeview_bookmarks_model.get_value(self.treeview_bookmarks_model.get_iter(path), 0)
+                if id >= 0: #len(path)==2:
+                    menu = Gtk.Menu()
+                    delete = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_DELETE, None)
+                    delete.connect('activate', lambda x: self.delete_bookmark(id))
+                    menu.append(delete)
+                    menu.show_all()
+                    menu.attach_to_widget(treeview, None)
+                    menu.popup(None, None, None, None, event.button, event.get_time())
+            return True
+
+    def update_bookmark_pane_from_paper(self, paper):
+        log_debug('update_bookmark_pane_from_paper called')
+        log_debug('self.displayed_bookmark: ' + str(self.displayed_bookmark))
+        log_debug('self.displayed_paper: ' + str(self.displayed_paper))
+        if not self.displayed_bookmark is None and self.bookmark_edited:
+            # we had a bookmark selected, save it
+            self.displayed_bookmark.save()
+            self.displayed_bookmark = None
+            self.bookmark_edited = False
+
+        if (not self.displayed_paper is None and
+            self.displayed_paper != paper and self.notes_edited): 
+            # we had another paper selected and the notes have changed, save it
+            log_debug('Saving paper with notes: ' + unicode(self.displayed_paper.notes))
+            # deconnect the post_save hooks
+            post_save_receivers = post_save.receivers 
+            post_save.receivers = []
+            self.displayed_paper.save()
+            post_save.receivers = post_save_receivers
+            self.notes_edited = False
+
+        self.displayed_paper = paper
+
+        toolbar_bookmarks = self.ui.get_object('toolbar_bookmarks')
+        for child in toolbar_bookmarks.get_children():
+            toolbar_bookmarks.remove(child)
+        self.treeview_bookmarks_model.clear()
+        if paper:
+            for bookmark in paper.bookmark_set.order_by('page'):
+                try: title = str(bookmark.notes).split('\n')[0]
+                except: title = str(bookmark.notes)
+                self.treeview_bookmarks_model.append((bookmark.id, bookmark.page + 1, title, bookmark.updated.strftime(DATE_FORMAT), len(str(bookmark.notes).split())))
+        self.refresh_pdf_preview_pane()
+        self.select_bookmark_pane_item()
+
+    def select_bookmark_pane_item(self, selection=None, bookmark_id=None):
+        if selection == None:
+            selection = self.ui.get_object('treeview_bookmarks').get_selection()
+        toolbar_bookmarks = self.ui.get_object('toolbar_bookmarks')
+        for child in toolbar_bookmarks.get_children():
+            toolbar_bookmarks.remove(child)
+
+        if bookmark_id != None:
+            selection.unselect_all()
+            # we're being asked to select a specific row, not handle a selection event
+            for i in range(0, len(self.treeview_bookmarks_model)):
+                if self.treeview_bookmarks_model[i][0] == bookmark_id:
+                    selection.select_path((i,))
+                    return
+
+        try: selected_bookmark_id = self.treeview_bookmarks_model.get_value(self.ui.get_object('treeview_bookmarks').get_selection().get_selected()[1], 0)
+        except: selected_bookmark_id = -1
+
+        paper_notes = self.ui.get_object('paper_notes')
+        try:
+            if not self.update_paper_notes_handler_id == None:
+                paper_notes.get_buffer().disconnect(self.update_paper_notes_handler_id)
+            self.update_paper_notes_handler_id = None
+        except:
+            self.update_paper_notes_handler_id = None
+
+        if selected_bookmark_id != -1:
+                bookmark = Bookmark.objects.get(id=selected_bookmark_id)
+                if bookmark != self.displayed_bookmark and self.bookmark_edited:
+                    # we changed from an edited bookmark, save the bookmark
+                    bookmark.save()                    
+                    self.bookmark_edited = False
+                self.displayed_bookmark = bookmark
+                paper_notes.get_buffer().set_text(bookmark.notes)
+                paper_notes.set_property('sensitive', True)
+                self.goto_pdf_page(bookmark.page)
+                self.update_paper_notes_handler_id = paper_notes.get_buffer().connect('changed', self.update_bookmark_notes, bookmark)
+        elif self.displayed_paper:
+                paper_notes.get_buffer().set_text(self.displayed_paper.notes)
+                paper_notes.set_property('sensitive', True)
+                self.update_paper_notes_handler_id = paper_notes.get_buffer().connect('changed', self.update_paper_notes, self.displayed_paper)
+        else:
+            paper_notes.get_buffer().set_text('')
+            paper_notes.set_property('sensitive', False)
+
+
+        if self.displayed_paper:
+            button = Gtk.ToolButton(stock_id=Gtk.STOCK_ADD)
+            button.set_tooltip_text('Add a new page note...')
+            button.connect('clicked', lambda x, paper: Bookmark.objects.create(paper=paper, page=self.pdf_preview['current_page_number']).save() or self.update_bookmark_pane_from_paper(self.displayed_paper), self.displayed_paper)
+            button.show()
+            toolbar_bookmarks.insert(button, -1)
+
+        if selected_bookmark_id != -1:
+            button = Gtk.ToolButton(stock_id=Gtk.STOCK_DELETE)
+            button.set_tooltip_text('Delete this page note...')
+            button.connect('clicked', lambda x: self.delete_bookmark(selected_bookmark_id))
+            button.show()
+            toolbar_bookmarks.insert(button, -1)
+
+    def update_bookmark_notes(self, text_buffer, bookmark):
+        bookmark.notes = text_buffer.get_text(text_buffer.get_start_iter(),
+                                              text_buffer.get_end_iter(), False)
+        self.bookmark_edited = True
+
+    ###########################################################################
+    # Paper notes
+    ###########################################################################
+    
+    def update_paper_notes(self, text_buffer, paper):
+        paper.notes = text_buffer.get_text(text_buffer.get_start_iter(),
+                                           text_buffer.get_end_iter(), False)
+        self.notes_edited = True
 
 
 class AuthorEditGUI:
