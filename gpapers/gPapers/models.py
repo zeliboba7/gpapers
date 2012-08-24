@@ -20,6 +20,7 @@ from datetime import datetime
 
 from django.db import models
 import django.core.files.base
+from django.db.models.signals import post_save
 
 from gi.repository import Gtk
 from gi.repository import Gdk
@@ -183,7 +184,11 @@ class Paper(models.Model):
             uri = 'file://' + self.full_text.path
             if Gtk.show_uri(None, uri, Gdk.CURRENT_TIME):
                 self.read_count = self.read_count + 1
+                # temporary disable receivers getting notified by post_save
+                receivers = post_save.receivers
+                post_save.receivers = []
                 self.save()
+                post_save.receivers = receivers
             else:
                 log_error('Failed to open %s' % uri)
 
