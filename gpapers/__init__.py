@@ -685,6 +685,7 @@ class MainGUI:
         about.set_license_type(Gtk.License.GPL_3_0)
         about.set_website(__url__)
         about.set_authors(__authors__)
+        about.set_logo_icon_name('gpapers')
         about.connect('response', lambda x, y: about.destroy())
         about.show()
 
